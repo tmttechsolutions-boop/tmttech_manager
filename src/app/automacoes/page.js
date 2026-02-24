@@ -17,7 +17,7 @@ import ActionNode from '@/components/flow/ActionNode';
 import MenuNode from '@/components/flow/MenuNode';
 import DelayNode from '@/components/flow/DelayNode';
 import ConditionNode from '@/components/flow/ConditionNode';
-import { supabase } from '@/lib/supabase';
+import { createSupabaseClient } from '@/lib/supabase';
 
 // Nossos blocos customizados
 const nodeTypes = {

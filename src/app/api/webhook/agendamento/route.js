@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createSupabaseClient } from '@/lib/supabase';
 
 export async function POST(req) {
     try {
+        const supabase = createSupabaseClient();
         const data = await req.json();
 
         // Supondo a estrutura: { name, phone, service, date_time }

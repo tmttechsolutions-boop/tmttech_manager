@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createSupabaseClient } from '@/lib/supabase';
 import { sendWhatsAppMessage } from '@/lib/evolution';
 
 // Esta rota deve ser chamada externamente a cada 5 ou 10 minutos (ex: por cron-job.org)
 export async function GET(req) {
     try {
+        const supabase = createSupabaseClient();
         // 1. Busca todas as regras ATIVAS
         const { data: rules, error: rulesError } = await supabase
             .from('automation_rules')

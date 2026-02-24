@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseClient } from '@/lib/supabase';
 
 export default function Pipeline() {
     const [columns, setColumns] = useState({});
@@ -14,6 +14,7 @@ export default function Pipeline() {
 
     const fetchLeads = async () => {
         setLoading(true);
+        const supabase = createSupabaseClient();
         const { data: leads, error } = await supabase
             .from('leads')
             .select('*, agendamentos(service, date_time)')
@@ -85,6 +86,7 @@ export default function Pipeline() {
         });
 
         // Atualiza o Status no Banco de Dados Real
+        const supabase = createSupabaseClient();
         const { error } = await supabase
             .from('leads')
             .update({ status: targetColId })

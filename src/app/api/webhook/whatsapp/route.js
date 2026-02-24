@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { createSupabaseClient } from '@/lib/supabase';
 import { sendWhatsAppMessage } from '@/lib/evolution'; // Importando a API Real
 
 // Esta rota será chamada pela Evolution API ou pela API Oficial do WhatsApp
 // Sempre que uma nova mensagem de um cliente chegar no seu número
 export async function POST(req) {
     try {
+        const supabase = createSupabaseClient();
         const data = await req.json();
 
         // Supondo uma estrutura genérica ou da Evolution API

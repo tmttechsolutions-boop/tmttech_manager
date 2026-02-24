@@ -1,8 +1,9 @@
 'use server';
 
-import { supabase } from '@/lib/supabase';
+import { createSupabaseClient } from '@/lib/supabase';
 
 export async function cadastrarLeadAction(newLead) {
+    const supabase = createSupabaseClient();
     try {
         // 1. Verifica se o lead já existe pelo telefone
         let { data: existingLead } = await supabase

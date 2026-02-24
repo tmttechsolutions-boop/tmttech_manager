@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { createSupabaseClient } from '@/lib/supabase';
 
 export default function Clientes() {
     const [clientes, setClientes] = useState([]);
@@ -12,6 +12,7 @@ export default function Clientes() {
 
     const fetchClientes = async () => {
         setLoading(true);
+        const supabase = createSupabaseClient();
         // Busca os clientes e seus agendamentos mais recentes
         const { data, error } = await supabase
             .from('leads')
@@ -67,8 +68,8 @@ export default function Clientes() {
 
                                 return (
                                     <tr key={cliente.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                                        <td style={{ padding: '16px', fontWeight: 'bold' }}>{cliente.name}</td>
-                                        <td style={{ padding: '16px' }}>{cliente.phone}</td>
+                                        <td style={{ padding: '16px', fontWeight: 'bold' }}>{cliente.nome}</td>
+                                        <td style={{ padding: '16px' }}>{cliente.telefone}</td>
                                         <td style={{ padding: '16px' }}>{getStatusBadge(cliente.status)}</td>
                                         <td style={{ padding: '16px' }}>
                                             {ultimoAgendamento ? ultimoAgendamento.service : <span className="text-muted">Sem Oportunidade</span>}

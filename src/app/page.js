@@ -1,9 +1,10 @@
 "use client";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { cadastrarLeadAction } from "@/app/actions/cadastrarLead";
+import { createSupabaseClient } from '@/lib/supabase';
+import { cadastrarLeadAction } from '@/app/actions/cadastrarLead';
 
 export default function Dashboard() {
+  const supabase = createSupabaseClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newLead, setNewLead] = useState({ name: '', phone: '', service: 'Consultoria Automotizada' });
   const [loading, setLoading] = useState(false);
