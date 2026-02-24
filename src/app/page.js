@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { cadastrarLeadAction } from "@/app/actions/cadastrarLead";
 
 export default function Dashboard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,42 +37,11 @@ export default function Dashboard() {
     setLoading(true);
 
     try {
-      // 1. Verifica se o lead já existe pelo telefone
-      let { data: existingLead } = await supabase
-        .from('leads')
-        .select('id')
-        .eq('telefone', newLead.phone)
-        .maybeSingle();
+      const res = await cadastrarLeadAction(newLead);
 
-      let leadId = null;
-
-      if (existingLead) {
-        leadId = existingLead.id;
-      } else {
-        // Se não existir, cria
-        const { data: leadReq, error: leadErr } = await supabase
-          .from('leads')
-          .insert([{ nome: newLead.name, telefone: newLead.phone, status: 'novo' }])
-          .select()
-          .single();
-
-        if (leadErr) throw leadErr;
-        leadId = leadReq.id;
+      if (!res.success) {
+        throw new Error(res.message);
       }
-
-      // 2. Cria o agendamento (Para testes, colocando 1 minuto no futuro para o motor pegar fácil se a regra for de 0 minutos, ou só a data atual)
-      const agendamentoDate = new Date();
-      agendamentoDate.setMinutes(agendamentoDate.getMinutes() + 2); // Agendado pra daqui 2 min pra dar tempo
-
-      const { error: agErr } = await supabase
-        .from('agendamentos')
-        .insert([{
-          lead_id: leadId,
-          service: newLead.service,
-          date_time: agendamentoDate.toISOString()
-        }]);
-
-      if (agErr) throw agErr;
 
       setIsModalOpen(false);
       setNewLead({ name: '', phone: '', service: 'Consultoria Automotizada' });
