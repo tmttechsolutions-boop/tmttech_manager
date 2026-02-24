@@ -93,8 +93,8 @@ export default function Dashboard() {
               <label>Serviço Interessado</label>
               <input required type="text" className="form-input" value={newLead.service} onChange={e => setNewLead({ ...newLead, service: e.target.value })} />
             </div>
-            <button type="submit" className="brand-button" disabled={loading}>
-              {loading ? 'Salvando...' : 'Salvar no CRM'}
+            <button type="submit" className="brand-button" disabled={loading || loadingEmpresa}>
+              {loading ? 'Salvando...' : loadingEmpresa ? 'Carregando Empresa...' : 'Salvar no CRM'}
             </button>
           </form>
         </div>

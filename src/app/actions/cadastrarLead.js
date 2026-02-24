@@ -1,9 +1,9 @@
 'use server';
 
-import { createSupabaseClient } from '@/lib/supabase';
+import { createClient } from '@/lib/supabase-server';
 
 export async function cadastrarLeadAction(newLead) {
-    const supabase = createSupabaseClient();
+    const supabase = await createClient();
     try {
         // 1. Verifica se o lead já existe pelo telefone DENTRO desta empresa específico
         let { data: existingLead } = await supabase
