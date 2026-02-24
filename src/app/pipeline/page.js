@@ -153,8 +153,14 @@ export default function Pipeline() {
                                 >
                                     <h4>{item.name}</h4>
                                     <span className="card-service">{item.serviço}</span>
-                                    <div className="card-footer">
+                                    <div className="card-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                         <span className="card-time">📅 {item.tempo}</span>
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); window.location.href = `/chat?leadId=${item.id}`; }}
+                                            style={{ background: 'rgba(192, 132, 252, 0.15)', color: '#c084fc', border: 'none', padding: '4px 8px', borderRadius: '4px', fontSize: '0.7rem', cursor: 'pointer' }}
+                                        >
+                                            💬 Chat
+                                        </button>
                                     </div>
                                 </div>
                             ))}

@@ -17,9 +17,7 @@ export async function sendWhatsAppMessage(phone, text) {
 
     try {
         const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
-
         // A Evolution API geralmente exige que o número tenha a formatação correta.
-        // Garantimos que seja apenas números.
         const cleanPhone = phone.replace(/\D/g, '');
 
         const response = await fetch(endpoint, {
@@ -31,22 +29,37 @@ export async function sendWhatsAppMessage(phone, text) {
             body: JSON.stringify({
                 number: cleanPhone,
                 options: {
-                    delay: 1200, // Um pequeno delay (1.2s) para a mensagem parecer mais humana
-                    presence: 'composing' // Mostra "digitando..." antes de enviar
+                    delay: 1200,
+                    presence: 'composing'
                 },
-                textMessage: {
-                    text: text
-                }
+                textMessage: { text: text }
             })
         });
 
-        if (!response.ok) {
-            const errData = await response.json();
-            console.error("Erro Evolution API:", errData);
-            throw new Error(`Falha no disparo: ${response.status}`);
+        const result = await response.json();
+
+        // 🟢 PERSISTÊNCIA: Salva no histórico de conversa (Outbound)
+        // Importamos dinamicamente para evitar ciclos ou problemas de inicialização
+        try {
+            const { createSupabaseClient } = require('./supabase');
+            const supabase = createSupabaseClient();
+
+            // Tenta achar o lead pelo telefone para vincular
+            const { data: lead } = await supabase.from('leads').select('id, empresa_id').eq('telefone', phone).single();
+
+            if (lead) {
+                await supabase.from('chat_messages').insert([{
+                    empresa_id: lead.empresa_id,
+                    lead_id: lead.id,
+                    direction: 'outbound',
+                    content: text,
+                    message_type: 'text'
+                }]);
+            }
+        } catch (dbErr) {
+            console.error("Erro ao registrar log de chat outbound:", dbErr);
         }
 
-        const result = await response.json();
         return { success: true, result };
 
     } catch (error) {

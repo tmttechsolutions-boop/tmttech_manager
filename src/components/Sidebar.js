@@ -31,6 +31,10 @@ export default function Sidebar() {
                     <span className="nav-icon">⚡</span>
                     <span className="nav-text">Automações</span>
                 </Link>
+                <Link href="/chat" className={`nav-item ${pathname === '/chat' ? 'active' : ''}`}>
+                    <span className="nav-icon">💬</span>
+                    <span className="nav-text">Conversas</span>
+                </Link>
                 <Link href="/conectar" className={`nav-item ${pathname === '/conectar' ? 'active' : ''}`}>
                     <span className="nav-icon" style={{ color: '#22c55e', display: 'flex', alignItems: 'center' }}>
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">

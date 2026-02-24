@@ -9,10 +9,19 @@ export async function POST(req) {
         const supabase = createSupabaseClient();
         const data = await req.json();
 
+        // 1. Identifica a Empresa através do nome da Instância (tmttech_ID-DA-EMPRESA)
+        const instanceName = data.instance || '';
+        const empresaId = instanceName.startsWith('tmttech_') ? instanceName.split('_')[1] : null;
+
+        if (!empresaId) {
+            console.warn("[WHATSAPP WEBHOOK] Instância não identificada ou sem empresa_id vinculado.");
+            return NextResponse.json({ message: 'Instância não mapeada.' }, { status: 200 });
+        }
+
         // Supondo uma estrutura genérica ou da Evolution API
-        const phone = data.phone || data.remoteJid?.split('@')[0];
-        const text = data.text || data.message?.conversation || data.message?.extendedTextMessage?.text || '';
-        const isReplyStory = data.type === 'story_reply' || data.message?.extendedTextMessage?.contextInfo?.isForwarded === false;
+        const phone = data.data?.key?.remoteJid?.split('@')[0] || data.phone || '';
+        const text = data.data?.message?.conversation || data.data?.message?.extendedTextMessage?.text || data.text || '';
+        const isReplyStory = data.type === 'story_reply' || data.data?.message?.extendedTextMessage?.contextInfo?.isForwarded === false;
 
         if (!phone || !text) {
             return NextResponse.json({ message: 'Mensagem vazia ou sem remetente ou é um evento interno ignorado.' }, { status: 200 });
@@ -31,11 +40,20 @@ export async function POST(req) {
         if (!lead) {
             const { data: newLead } = await supabase
                 .from('leads')
-                .insert([{ nome: `Contato ${phone.slice(-4)}`, telefone: phone, status: 'novo' }])
+                .insert([{ nome: `Contato ${phone.slice(-4)}`, telefone: phone, status: 'novo', empresa_id: empresaId }])
                 .select()
                 .single();
             lead = newLead;
         }
+
+        // 3. PERSISTÊNCIA: Salva esta mensagem no histórico de CHAT (Visível na UI de Chat)
+        await supabase.from('chat_messages').insert([{
+            empresa_id: empresaId,
+            lead_id: lead.id,
+            direction: 'inbound',
+            content: text,
+            message_type: 'text'
+        }]);
 
         // ==========================================
         // MOTOR DE REGRAS (MANYCHAT CLONE)
