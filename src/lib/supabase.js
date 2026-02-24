@@ -10,4 +10,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error("URGENT: Supabase env vars are missing!");
 }
 
-export const supabase = createClient(supabaseUrl || 'https://placeholder.supabase.co', supabaseAnonKey || 'placeholder-key')
+export const supabase = createClient(
+    supabaseUrl || 'https://placeholder.supabase.co',
+    supabaseAnonKey || 'placeholder-key',
+    {
+        global: {
+            fetch: (...args) => fetch(...args),
+        },
+    }
+)
