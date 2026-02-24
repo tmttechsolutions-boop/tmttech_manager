@@ -1,5 +1,6 @@
 "use client";
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import {
     ReactFlow,
     ReactFlowProvider,
@@ -12,14 +13,15 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
+import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
+import { useEmpresa } from "@/hooks/useEmpresa";
+
 import TriggerNode from '@/components/flow/TriggerNode';
 import ActionNode from '@/components/flow/ActionNode';
 import MenuNode from '@/components/flow/MenuNode';
 import DelayNode from '@/components/flow/DelayNode';
 import ConditionNode from '@/components/flow/ConditionNode';
 import CustomEdge from '@/components/flow/CustomEdge';
-import { createSupabaseClient } from '@/lib/supabase';
-import { useEmpresa } from "@/hooks/useEmpresa";
 
 // Nossos blocos customizados
 const nodeTypes = {
@@ -84,9 +86,6 @@ const DragAndDropSidebar = () => {
     );
 };
 
-import { useParams, useRouter } from 'next/navigation';
-import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
-
 // ==============================
 // Área Principal do Flow (Canvas)
 // ==============================
@@ -94,8 +93,9 @@ const FlowArea = () => {
     const params = useParams();
     const router = useRouter();
     const ruleId = params.id;
-    const { empresaId } = useEmpresa();
+    const { empresaId, loadingEmpresa } = useEmpresa();
     const supabase = createBrowserSupabaseClient();
+
 
     const reactFlowWrapper = useRef(null);
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
