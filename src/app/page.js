@@ -80,7 +80,7 @@ export default function Dashboard() {
 
     } catch (error) {
       console.error(error);
-      alert("Erro ao cadastrar.");
+      alert(`Erro ao cadastrar: ${error.message || JSON.stringify(error)}`);
     } finally {
       setLoading(false);
     }
