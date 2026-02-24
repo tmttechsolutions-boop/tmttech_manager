@@ -8,7 +8,7 @@ export default function Dashboard() {
   const supabase = createSupabaseClient();
   const { empresaId, loadingEmpresa } = useEmpresa();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newLead, setNewLead] = useState({ name: '', phone: '', service: 'Consultoria Automotizada' });
+  const [newLead, setNewLead] = useState({ nome: '', phone: '', service: 'Consultoria Automotizada' });
   const [loading, setLoading] = useState(false);
 
   // Stats Counters
