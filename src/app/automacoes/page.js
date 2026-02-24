@@ -1,335 +1,178 @@
 "use client";
-import React, { useState, useCallback, useRef } from 'react';
-import {
-    ReactFlow,
-    ReactFlowProvider,
-    useNodesState,
-    useEdgesState,
-    addEdge,
-    Controls,
-    Background,
-    useReactFlow,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
-
-import TriggerNode from '@/components/flow/TriggerNode';
-import ActionNode from '@/components/flow/ActionNode';
-import MenuNode from '@/components/flow/MenuNode';
-import DelayNode from '@/components/flow/DelayNode';
-import ConditionNode from '@/components/flow/ConditionNode';
-import CustomEdge from '@/components/flow/CustomEdge';
-import { createSupabaseClient } from '@/lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { createBrowserSupabaseClient } from '@/lib/supabase-browser';
 import { useEmpresa } from "@/hooks/useEmpresa";
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
-// Nossos blocos customizados
-const nodeTypes = {
-    trigger: TriggerNode,
-    action: ActionNode,
-    menu: MenuNode,
-    delay: DelayNode,
-    condition: ConditionNode,
-};
+export default function AutomacoesList() {
+    const { empresaId, loadingEmpresa } = useEmpresa();
+    const router = useRouter();
+    const supabase = createBrowserSupabaseClient();
+    const [rules, setRules] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-const edgeTypes = {
-    custom: CustomEdge,
-};
+    useEffect(() => {
+        if (empresaId) {
+            fetchRules();
+        }
+    }, [empresaId]);
 
-// ==============================
-// Menu Lateral Drag and Drop
-// ==============================
-const DragAndDropSidebar = () => {
-    const onDragStart = (event, nodeType, label) => {
-        event.dataTransfer.setData('application/reactflow/type', nodeType);
-        event.dataTransfer.setData('application/reactflow/label', label);
-        event.dataTransfer.effectAllowed = 'move';
+    const fetchRules = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+            .from('automation_rules')
+            .select('*')
+            .eq('empresa_id', empresaId)
+            .order('created_at', { ascending: false });
+
+        if (data) setRules(data);
+        if (error) console.error("Erro ao buscar regras:", error);
+        setLoading(false);
     };
 
-    return (
-        <div className="dnd-sidebar">
-            <h2 style={{ fontSize: '1.1rem', marginBottom: '8px' }}>Construtor de Flow</h2>
-            <p className="text-muted" style={{ fontSize: '0.8rem', marginBottom: '16px' }}>
-                Arraste os passos para o quadro
-            </p>
+    const toggleRuleActive = async (id, currentStatus) => {
+        const { error } = await supabase
+            .from('automation_rules')
+            .update({ is_active: !currentStatus })
+            .eq('id', id)
+            .eq('empresa_id', empresaId);
 
-            <div className="dnd-category">
-                <div className="dnd-category-title">Passo Inicial</div>
-                <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'trigger', 'Gatilho')} draggable>
-                    <span className="icon" style={{ color: 'var(--success)' }}>⚡</span> Gatilho
-                </div>
+        if (!error) {
+            setRules(rules.map(r => r.id === id ? { ...r, is_active: !currentStatus } : r));
+        } else {
+            alert('Falha ao alterar status da regra.');
+        }
+    };
+
+    const deleteRule = async (id) => {
+        if (!confirm('Tem certeza que deseja apagar permanentemente este fluxo?')) return;
+
+        const { error } = await supabase
+            .from('automation_rules')
+            .delete()
+            .eq('id', id)
+            .eq('empresa_id', empresaId);
+
+        if (!error) {
+            setRules(rules.filter(r => r.id !== id));
+        } else {
+            alert('Falha ao excluir o fluxo.');
+        }
+    };
+
+    const handleCreateNew = async () => {
+        if (!empresaId) return;
+
+        const newRuleName = prompt("Qual o nome do novo Fluxo de Automação?");
+        if (!newRuleName) return;
+
+        // Criamos o rascunho no banco
+        const { data: newRule, error } = await supabase
+            .from('automation_rules')
+            .insert([{
+                empresa_id: empresaId,
+                name: newRuleName,
+                description: 'Novo Fluxo Visual',
+                trigger_type: 'mensagem_qualquer', // Padrão
+                offset_minutes: 0,
+                message_template: 'Sua mensagem aqui',
+                is_active: false,
+                flow_data: {}
+            }])
+            .select()
+            .single();
+
+        if (error) {
+            alert('Erro ao criar fluxo.' + error.message);
+            return;
+        }
+
+        router.push(`/automacoes/${newRule.id}`);
+    };
+
+    if (loadingEmpresa) {
+        return (
+            <div className="pipeline-container">
+                <header className="page-header">
+                    <h1>Carregando Automações...</h1>
+                </header>
             </div>
-
-            <div className="dnd-category">
-                <div className="dnd-category-title">Conteúdo / WhatsApp</div>
-                <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'action', 'Enviar Mensagem')} draggable>
-                    <span className="icon" style={{ color: 'var(--brand-purple-light)' }}>💬</span> Enviar Mensagem
-                </div>
-                <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'menu', 'Service Menu')} draggable>
-                    <span className="icon">📱</span> Menu com Botões
-                </div>
-                <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'action', 'Talk with Human')} draggable>
-                    <span className="icon">👤</span> Falar com Atendente
-                </div>
-            </div>
-
-            <div className="dnd-category">
-                <div className="dnd-category-title">Lógica</div>
-                <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'condition', 'Condição')} draggable>
-                    <span className="icon" style={{ color: '#60a5fa' }}>🔀</span> Condição (Sim/Não)
-                </div>
-                <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'delay', 'Atraso')} draggable>
-                    <span className="icon" style={{ color: 'var(--warning)' }}>⏱️</span> Atraso Inteligente
-                </div>
-            </div>
-        </div>
-    );
-};
-
-// ==============================
-// Área Principal do Flow (Canvas)
-// ==============================
-const FlowArea = () => {
-    const { empresaId } = useEmpresa();
-    const reactFlowWrapper = useRef(null);
-    const [nodes, setNodes, onNodesChange] = useNodesState([]);
-    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-    const [selectedNode, setSelectedNode] = useState(null);
-    const { screenToFlowPosition } = useReactFlow();
-
-    // Conexões de cabos
-    const onConnect = useCallback(
-        (params) => setEdges((eds) => addEdge({ ...params, type: 'custom', animated: true, style: { stroke: '#c084fc', strokeWidth: 2 } }, eds)),
-        [setEdges],
-    );
-
-    // Arrastou item sobre o painel
-    const onDragOver = useCallback((event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-    }, []);
-
-    // Soltou o item no painel
-    const onDrop = useCallback(
-        (event) => {
-            event.preventDefault();
-            const type = event.dataTransfer.getData('application/reactflow/type');
-            const label = event.dataTransfer.getData('application/reactflow/label');
-
-            if (!type) { return; }
-
-            const position = screenToFlowPosition({
-                x: event.clientX,
-                y: event.clientY,
-            });
-
-            const newNode = {
-                id: `${type}-${Date.now()}`,
-                type,
-                position,
-                data: { label: label },
-            };
-
-            setNodes((nds) => nds.concat(newNode));
-        },
-        [screenToFlowPosition, setNodes],
-    );
-
-    // Seleção e Properties Sidebar
-    const onNodeClick = (event, node) => setSelectedNode(node);
-    const onPaneClick = () => setSelectedNode(null);
-
-    const updateNodeData = (id, newData) => {
-        setNodes((nds) =>
-            nds.map((node) => {
-                if (node.id === id) {
-                    node.data = { ...node.data, ...newData };
-                }
-                return node;
-            })
         );
-        setSelectedNode((prev) => prev && prev.id === id ? { ...prev, data: { ...prev.data, ...newData } } : prev);
-    };
-
-    const saveFlow = async () => {
-        const triggerLength = nodes.filter(n => n.type === 'trigger').length;
-        if (triggerLength === 0) return alert("Você precisa adicionar pelo menos um Gatilho (Passo Inicial).");
-
-        if (!empresaId) return alert("Erro de Autenticação: Empresa não identificada.");
-
-        // TODO: Enviar JSON das rotas e empresaId para a api de salvamento final.
-        alert(`A Lógica Visual do ManyChat foi mapeada com sucesso para a empresa ID: ${empresaId} (Mocks JSON gravados).`);
     }
 
     return (
-        <div style={{ width: '100%', height: 'calc(100vh - 100px)', position: 'relative', margin: '-32px' }} ref={reactFlowWrapper}>
-
-            <DragAndDropSidebar />
-
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={onConnect}
-                onDrop={onDrop}
-                onDragOver={onDragOver}
-                onNodeClick={onNodeClick}
-                onPaneClick={onPaneClick}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                defaultEdgeOptions={{ type: 'custom' }}
-                className="bg-main-flow"
-                fitView
-            >
-                <Background color="#cbd5e1" gap={16} />
-                <Controls position="bottom-right" />
-
-                {/* Save Button */}
-                <div style={{ position: 'absolute', top: '20px', left: '320px', zIndex: 10 }}>
-                    <button className="brand-button" onClick={saveFlow}>💾 Publicar Automação</button>
+        <div className="pipeline-container">
+            <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+                <div>
+                    <h1>Automações (Flows)</h1>
+                    <p className="text-muted">Gerencie seus fluxos ativos de comunicação no WhatsApp.</p>
                 </div>
-            </ReactFlow>
+                <button onClick={handleCreateNew} className="brand-button">
+                    + Novo Fluxo
+                </button>
+            </header>
 
-            {/* Editor Lateral Direito (Ao Clicar no Bloco) */}
-            {selectedNode && (
-                <div className="flow-sidebar">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                        <h3 style={{ fontSize: '1.2rem' }}>⚙️ Editar Bloco</h3>
-                        <button onClick={onPaneClick} style={{ color: 'white', fontSize: '1.2rem', background: 'transparent', border: 'none', cursor: 'pointer' }}>✕</button>
-                    </div>
+            {loading ? (
+                <p>Carregando fluxos...</p>
+            ) : rules.length === 0 ? (
+                <div className="glass-panel" style={{ textAlign: 'center', padding: '64px 32px' }}>
+                    <h3 style={{ marginBottom: '16px' }}>Nenhuma automação criada ainda</h3>
+                    <p className="text-muted" style={{ marginBottom: '24px' }}>Crie seu primeiro fluxo visual para responder clientes automaticamente.</p>
+                    <button onClick={handleCreateNew} className="brand-button">+ Construir Primeiro Fluxo</button>
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '24px' }}>
+                    {rules.map((rule) => (
+                        <div key={rule.id} className="glass-panel" style={{ padding: '24px', position: 'relative', display: 'flex', flexDirection: 'column' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                                <h3 style={{ fontSize: '1.1rem', fontWeight: '600' }}>{rule.name || 'Fluxo sem nome'}</h3>
 
-                    {selectedNode.type === 'trigger' && (
-                        <div className="rule-form">
-                            <div className="form-group mb-4">
-                                <label>Gatilho (Quando isso acontecer):</label>
-                                <select className="form-input">
-                                    <option>O usuário envia uma mensagem</option>
-                                    <option>Mencionou no Story</option>
-                                </select>
+                                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
+                                    <span style={{ fontSize: '0.8rem', color: rule.is_active ? 'var(--success)' : 'var(--text-muted)' }}>
+                                        {rule.is_active ? 'Ativo' : 'Inativo'}
+                                    </span>
+                                    <div style={{
+                                        width: '40px', height: '22px', borderRadius: '12px',
+                                        background: rule.is_active ? 'var(--success)' : 'rgba(255,255,255,0.1)',
+                                        position: 'relative', transition: '0.3s'
+                                    }} onClick={(e) => { e.preventDefault(); toggleRuleActive(rule.id, rule.is_active); }}>
+                                        <div style={{
+                                            width: '18px', height: '18px', borderRadius: '50%', background: 'white',
+                                            position: 'absolute', top: '2px', left: rule.is_active ? '20px' : '2px', transition: '0.3s'
+                                        }}></div>
+                                    </div>
+                                </label>
                             </div>
-                            <div className="form-group">
-                                <label>Palavra-chave Opcional:</label>
-                                <input type="text" className="form-input" placeholder="Ex: PREÇO" />
+
+                            <p className="text-muted" style={{ fontSize: '0.85rem', marginBottom: '16px', flexGrow: 1 }}>
+                                {rule.description || 'Nenhuma descrição fornecida.'}
+                            </p>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', marginBottom: '24px', background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '6px' }}>
+                                <span style={{ color: '#c084fc' }}>⚡ Gatilho: </span>
+                                <span>{
+                                    rule.trigger_type === 'palavra_chave' ? `Palavra '${rule.trigger_keyword}'` :
+                                        rule.trigger_type === 'agendamento' ? `Agendamento (${rule.offset_minutes}m)` :
+                                            rule.trigger_type === 'resposta_story' ? 'Resposta a Story' :
+                                                'Qualquer Mensagem'
+                                }</span>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                                <Link href={`/automacoes/${rule.id}`} style={{ flexGrow: 1 }}>
+                                    <button className="brand-button" style={{ width: '100%', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border-subtle)' }}>
+                                        ✏️ Editar Fluxo
+                                    </button>
+                                </Link>
+                                <button onClick={() => deleteRule(rule.id)} style={{ width: '40px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                                    🗑️
+                                </button>
                             </div>
                         </div>
-                    )}
-
-                    {selectedNode.type === 'action' && (
-                        <div className="rule-form">
-                            <div className="form-group">
-                                <label>Texto do Conteúdo:</label>
-                                <textarea
-                                    className="form-input template-textarea"
-                                    rows={6}
-                                    value={selectedNode.data.message || ''}
-                                    onChange={(e) => updateNodeData(selectedNode.id, { message: e.target.value })}
-                                    placeholder="Nossa barbearia agradece..."
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedNode.type === 'menu' && (
-                        <div className="rule-form">
-                            <div className="form-group mb-4">
-                                <label>Mensagem Principal:</label>
-                                <textarea
-                                    className="form-input template-textarea"
-                                    rows={3}
-                                    value={selectedNode.data.message || 'Selecione uma das opções disponíveis:'}
-                                    onChange={(e) => updateNodeData(selectedNode.id, { message: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Ações Adicionadas (Botões):</label>
-                                <div className="menu-buttons mt-2">
-                                    {(selectedNode.data.buttons || ['Opção 1', 'Opção 2']).map((btn, idx) => (
-                                        <input
-                                            key={idx}
-                                            type="text"
-                                            className="form-input"
-                                            value={btn}
-                                            onChange={(e) => {
-                                                const newBtns = [...(selectedNode.data.buttons || ['Opção 1', 'Opção 2'])];
-                                                newBtns[idx] = e.target.value;
-                                                updateNodeData(selectedNode.id, { buttons: newBtns });
-                                            }}
-                                            style={{ marginBottom: '8px' }}
-                                        />
-                                    ))}
-                                </div>
-                                <button className="brand-button mt-4" style={{ width: '100%', fontSize: '0.8rem', padding: '6px' }} onClick={() => {
-                                    const newBtns = [...(selectedNode.data.buttons || ['Opção 1', 'Opção 2']), 'Nova Opção'];
-                                    updateNodeData(selectedNode.id, { buttons: newBtns });
-                                }}>+ Novo Botão</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedNode.type === 'delay' && (
-                        <div className="rule-form">
-                            <div className="form-group">
-                                <label>Atraso Inteligente (Tempo):</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    value={selectedNode.data.delay || 'Aguardar 1 dia'}
-                                    onChange={(e) => updateNodeData(selectedNode.id, { delay: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {selectedNode.type === 'condition' && (
-                        <div className="rule-form">
-                            <div className="form-group mb-4">
-                                <label>Campo a Validar:</label>
-                                <select
-                                    className="form-input"
-                                    value={selectedNode.data.conditionField || 'Status Kanban'}
-                                    onChange={(e) => updateNodeData(selectedNode.id, { conditionField: e.target.value })}
-                                >
-                                    <option>Status Kanban</option>
-                                    <option>Telefone do Lead</option>
-                                    <option>Último Serviço</option>
-                                    <option>Data de Criação</option>
-                                </select>
-                            </div>
-                            <div className="form-group mb-4">
-                                <label>Condição (Operador):</label>
-                                <select
-                                    className="form-input"
-                                    value={selectedNode.data.conditionOperator || '='}
-                                    onChange={(e) => updateNodeData(selectedNode.id, { conditionOperator: e.target.value })}
-                                >
-                                    <option value="=">É exatamente igual a</option>
-                                    <option value="!=">É diferente de</option>
-                                    <option value="contem">Contém o texto</option>
-                                    <option value=">">É maior que</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Valor Esperado:</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="Ex: Agendado"
-                                    value={selectedNode.data.conditionValue || ''}
-                                    onChange={(e) => updateNodeData(selectedNode.id, { conditionValue: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    )}
-
+                    ))}
                 </div>
             )}
         </div>
-    );
-};
-
-export default function Automacoes() {
-    return (
-        <ReactFlowProvider>
-            <FlowArea />
-        </ReactFlowProvider>
     );
 }
