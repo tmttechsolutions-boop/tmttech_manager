@@ -170,6 +170,7 @@ const FlowArea = () => {
                 onPaneClick={onPaneClick}
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
+                defaultEdgeOptions={{ type: 'custom' }}
                 className="bg-main-flow"
                 fitView
             >
