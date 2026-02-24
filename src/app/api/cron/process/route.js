@@ -60,16 +60,19 @@ export async function GET(req) {
                             .replace('{{hora}}', horaFormatada);
 
                         // ============================================
-                        // CONEXÃO EVOLUTION API OFICIAL!
+                        // TODO FASE 7.5: RECUPERAR INSTÂNCIA DO WHATSAPP DA EMPRESA X
+                        // Por enquanto, usa a instância global 'tmttech_manager', mas no futuro 
+                        // leremos 'rule.empresa_id' para disparar do WhatsApp correto.
                         // ============================================
                         console.log(`[DISPARO CRON WHATSAPP] Para: ${ag.leads.telefone} -> Mensagem: ${mensagemFinal}`);
                         await sendWhatsAppMessage(ag.leads.telefone, mensagemFinal);
 
-                        // Registra no Log que a mensagem foi enviada para não mandar duas vezes
+                        // Registra no Log isolado por Empresa que a mensagem foi enviada
                         await supabase.from('message_logs').insert([{
                             rule_id: rule.id,
                             lead_id: ag.leads.id,
                             agendamento_id: ag.id,
+                            empresa_id: rule.empresa_id,
                             status: 'enviado'
                         }]);
 

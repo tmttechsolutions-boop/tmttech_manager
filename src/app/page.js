@@ -2,9 +2,11 @@
 import { useState, useEffect } from "react";
 import { createSupabaseClient } from '@/lib/supabase';
 import { cadastrarLeadAction } from '@/app/actions/cadastrarLead';
+import { useEmpresa } from "@/hooks/useEmpresa";
 
 export default function Dashboard() {
   const supabase = createSupabaseClient();
+  const { empresaId, loadingEmpresa } = useEmpresa();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newLead, setNewLead] = useState({ name: '', phone: '', service: 'Consultoria Automotizada' });
   const [loading, setLoading] = useState(false);
@@ -13,12 +15,14 @@ export default function Dashboard() {
   const [statsData, setStatsData] = useState({ leads: 0, ativos: 0 });
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (empresaId) {
+      fetchDashboardData();
+    }
+  }, [empresaId]);
 
   const fetchDashboardData = async () => {
-    const { count: leadsCount } = await supabase.from('leads').select('*', { count: 'exact', head: true });
-    const { count: agendamentosCount } = await supabase.from('agendamentos').select('*', { count: 'exact', head: true }).eq('status', 'confirmado');
+    const { count: leadsCount } = await supabase.from('leads').select('*', { count: 'exact', head: true }).eq('empresa_id', empresaId);
+    const { count: agendamentosCount } = await supabase.from('agendamentos').select('*', { count: 'exact', head: true }).eq('status', 'confirmado').eq('empresa_id', empresaId);
 
     setStatsData({
       leads: leadsCount || 0,
@@ -38,7 +42,7 @@ export default function Dashboard() {
     setLoading(true);
 
     try {
-      const res = await cadastrarLeadAction(newLead);
+      const res = await cadastrarLeadAction({ ...newLead, empresa_id: empresaId });
 
       if (!res.success) {
         throw new Error(res.message);

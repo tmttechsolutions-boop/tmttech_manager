@@ -1,14 +1,18 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createSupabaseClient } from '@/lib/supabase';
+import { useEmpresa } from "@/hooks/useEmpresa";
 
 export default function Clientes() {
+    const { empresaId, loadingEmpresa } = useEmpresa();
     const [clientes, setClientes] = useState([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchClientes();
-    }, []);
+        if (empresaId) {
+            fetchClientes();
+        }
+    }, [empresaId]);
 
     const fetchClientes = async () => {
         setLoading(true);
@@ -17,6 +21,7 @@ export default function Clientes() {
         const { data, error } = await supabase
             .from('leads')
             .select('*, agendamentos(service, date_time)')
+            .eq('empresa_id', empresaId)
             .order('created_at', { ascending: false });
 
         if (!error && data) {

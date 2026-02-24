@@ -19,6 +19,7 @@ import DelayNode from '@/components/flow/DelayNode';
 import ConditionNode from '@/components/flow/ConditionNode';
 import CustomEdge from '@/components/flow/CustomEdge';
 import { createSupabaseClient } from '@/lib/supabase';
+import { useEmpresa } from "@/hooks/useEmpresa";
 
 // Nossos blocos customizados
 const nodeTypes = {
@@ -87,6 +88,7 @@ const DragAndDropSidebar = () => {
 // Área Principal do Flow (Canvas)
 // ==============================
 const FlowArea = () => {
+    const { empresaId } = useEmpresa();
     const reactFlowWrapper = useRef(null);
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -147,10 +149,14 @@ const FlowArea = () => {
         setSelectedNode((prev) => prev && prev.id === id ? { ...prev, data: { ...prev.data, ...newData } } : prev);
     };
 
-    const saveFlow = () => {
+    const saveFlow = async () => {
         const triggerLength = nodes.filter(n => n.type === 'trigger').length;
         if (triggerLength === 0) return alert("Você precisa adicionar pelo menos um Gatilho (Passo Inicial).");
-        alert("A Lógica Visual do ManyChat foi mapeada com sucesso (Mocks JSON gravados).");
+
+        if (!empresaId) return alert("Erro de Autenticação: Empresa não identificada.");
+
+        // TODO: Enviar JSON das rotas e empresaId para a api de salvamento final.
+        alert(`A Lógica Visual do ManyChat foi mapeada com sucesso para a empresa ID: ${empresaId} (Mocks JSON gravados).`);
     }
 
     return (

@@ -101,10 +101,11 @@ export async function POST(req) {
                     await sendWhatsAppMessage(lead.telefone, mensagemFinal);
                     console.log(`================================\n`);
 
-                    // Registra logs
+                    // Registra log isolado por conta no webhook de resposta
                     await supabase.from('message_logs').insert([{
                         rule_id: rule.id,
                         lead_id: lead.id,
+                        empresa_id: lead.empresa_id,
                         status: 'enviado'
                     }]);
 

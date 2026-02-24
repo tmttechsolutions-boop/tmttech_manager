@@ -1,16 +1,20 @@
 "use client";
 import { useState, useEffect } from "react";
 import { createSupabaseClient } from '@/lib/supabase';
+import { useEmpresa } from "@/hooks/useEmpresa";
 
 export default function Pipeline() {
+    const { empresaId, loadingEmpresa } = useEmpresa();
     const [columns, setColumns] = useState({});
     const [draggedItem, setDraggedItem] = useState(null);
     const [loading, setLoading] = useState(true);
 
     // Busca os leads reais do banco de dados na inicialização
     useEffect(() => {
-        fetchLeads();
-    }, []);
+        if (empresaId) {
+            fetchLeads();
+        }
+    }, [empresaId]);
 
     const fetchLeads = async () => {
         setLoading(true);
@@ -18,6 +22,7 @@ export default function Pipeline() {
         const { data: leads, error } = await supabase
             .from('leads')
             .select('*, agendamentos(service, date_time)')
+            .eq('empresa_id', empresaId)
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -90,7 +95,8 @@ export default function Pipeline() {
         const { error } = await supabase
             .from('leads')
             .update({ status: targetColId })
-            .eq('id', item.id);
+            .eq('id', item.id)
+            .eq('empresa_id', empresaId);
 
         if (error) {
             console.error("Erro ao atualizar lead:", error);
