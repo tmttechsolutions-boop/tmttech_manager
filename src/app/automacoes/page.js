@@ -17,6 +17,7 @@ import ActionNode from '@/components/flow/ActionNode';
 import MenuNode from '@/components/flow/MenuNode';
 import DelayNode from '@/components/flow/DelayNode';
 import ConditionNode from '@/components/flow/ConditionNode';
+import CustomEdge from '@/components/flow/CustomEdge';
 import { createSupabaseClient } from '@/lib/supabase';
 
 // Nossos blocos customizados
@@ -26,6 +27,10 @@ const nodeTypes = {
     menu: MenuNode,
     delay: DelayNode,
     condition: ConditionNode,
+};
+
+const edgeTypes = {
+    custom: CustomEdge,
 };
 
 // ==============================
@@ -90,7 +95,7 @@ const FlowArea = () => {
 
     // Conexões de cabos
     const onConnect = useCallback(
-        (params) => setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: '#c084fc', strokeWidth: 2 } }, eds)),
+        (params) => setEdges((eds) => addEdge({ ...params, type: 'custom', animated: true, style: { stroke: '#c084fc', strokeWidth: 2 } }, eds)),
         [setEdges],
     );
 
@@ -164,6 +169,7 @@ const FlowArea = () => {
                 onNodeClick={onNodeClick}
                 onPaneClick={onPaneClick}
                 nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
                 className="bg-main-flow"
                 fitView
             >
@@ -268,17 +274,41 @@ const FlowArea = () => {
 
                     {selectedNode.type === 'condition' && (
                         <div className="rule-form">
-                            <div className="form-group">
-                                <label>Regra da Condição:</label>
+                            <div className="form-group mb-4">
+                                <label>Campo a Validar:</label>
                                 <select
                                     className="form-input"
-                                    value={selectedNode.data.condition || 'Tem Agendamento?'}
-                                    onChange={(e) => updateNodeData(selectedNode.id, { condition: e.target.value })}
+                                    value={selectedNode.data.conditionField || 'Status Kanban'}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { conditionField: e.target.value })}
                                 >
-                                    <option>Tem Agendamento?</option>
-                                    <option>É primeira mensagem?</option>
-                                    <option>Dentro do horário comercial?</option>
+                                    <option>Status Kanban</option>
+                                    <option>Telefone do Lead</option>
+                                    <option>Último Serviço</option>
+                                    <option>Data de Criação</option>
                                 </select>
+                            </div>
+                            <div className="form-group mb-4">
+                                <label>Condição (Operador):</label>
+                                <select
+                                    className="form-input"
+                                    value={selectedNode.data.conditionOperator || '='}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { conditionOperator: e.target.value })}
+                                >
+                                    <option value="=">É exatamente igual a</option>
+                                    <option value="!=">É diferente de</option>
+                                    <option value="contem">Contém o texto</option>
+                                    <option value=">">É maior que</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Valor Esperado:</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Ex: Agendado"
+                                    value={selectedNode.data.conditionValue || ''}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { conditionValue: e.target.value })}
+                                />
                             </div>
                         </div>
                     )}

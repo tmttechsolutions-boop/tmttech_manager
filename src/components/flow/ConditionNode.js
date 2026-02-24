@@ -9,7 +9,12 @@ export default function ConditionNode({ data, selected }) {
                 <strong>Condição</strong>
             </div>
             <div className="node-body">
-                <p className="node-label text-center">{data.condition || 'Tem Agendamento?'}</p>
+                <div style={{ background: 'rgba(0,0,0,0.2)', padding: '6px', borderRadius: '4px', marginBottom: '8px' }}>
+                    <p className="node-label text-center" style={{ fontSize: '0.75rem', color: '#94a3b8', margin: 0 }}>Se atender a regra:</p>
+                    <p className="node-label text-center" style={{ fontWeight: 'bold', margin: '4px 0 0 0' }}>
+                        {data.conditionField || 'Qualquer'} {data.conditionOperator || '='} {data.conditionValue || '...'}
+                    </p>
+                </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '12px' }}>
                     <span style={{ fontSize: '0.8rem', color: 'var(--success)' }}>✅ Sim</span>
                     <span style={{ fontSize: '0.8rem', color: 'var(--danger)' }}>❌ Não</span>
