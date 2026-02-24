@@ -56,11 +56,11 @@ export default function ChatPage() {
         const { data, error } = await supabase
             .from('leads')
             .select(`
-                id, name, telefone, status,
+                id, nome, telefone, status,
                 chat_messages(content, created_at)
             `)
             .eq('empresa_id', empresaId)
-            .order('name');
+            .order('nome');
 
         if (data) {
             // Ordenar por última mensagem ou nome
@@ -137,7 +137,7 @@ export default function ChatPage() {
                             className="chat-contact-item"
                         >
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h4 style={{ fontSize: '1rem', fontWeight: '600' }}>{lead.name}</h4>
+                                <h4 style={{ fontSize: '1rem', fontWeight: '600' }}>{lead.nome}</h4>
                                 <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                                     {lead.status.toUpperCase()}
                                 </span>
@@ -157,10 +157,10 @@ export default function ChatPage() {
                         {/* Header do Chat */}
                         <div style={{ padding: '16px 32px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--brand-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                                {selectedLead.name.charAt(0)}
+                                {selectedLead.nome.charAt(0)}
                             </div>
                             <div>
-                                <h3 style={{ fontSize: '1rem' }}>{selectedLead.name}</h3>
+                                <h3 style={{ fontSize: '1rem' }}>{selectedLead.nome}</h3>
                                 <span style={{ fontSize: '0.75rem', color: 'var(--success)' }}>● Online</span>
                             </div>
                         </div>

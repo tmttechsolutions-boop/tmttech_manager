@@ -49,7 +49,7 @@ export default function Dashboard() {
       }
 
       setIsModalOpen(false);
-      setNewLead({ name: '', phone: '', service: 'Consultoria Automotizada' });
+      setNewLead({ nome: '', phone: '', service: 'Consultoria Automotizada' });
       fetchDashboardData();
       alert("Lead & Agendamento criados com sucesso! Verifique o Kanban.");
 
@@ -82,7 +82,7 @@ export default function Dashboard() {
             <div className="time-inputs mb-4">
               <div style={{ flex: 1 }}>
                 <label>Nome do Cliente</label>
-                <input required type="text" className="form-input" value={newLead.name} onChange={e => setNewLead({ ...newLead, name: e.target.value })} />
+                <input required type="text" className="form-input" value={newLead.nome} onChange={e => setNewLead({ ...newLead, nome: e.target.value })} />
               </div>
               <div style={{ flex: 1 }}>
                 <label>Telefone (WhatsApp)</label>

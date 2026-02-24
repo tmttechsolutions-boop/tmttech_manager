@@ -47,7 +47,7 @@ export default function Pipeline() {
 
             const card = {
                 id: lead.id,
-                name: lead.name,
+                name: lead.nome,
                 serviço: servico,
                 tempo: new Date(lead.created_at).toLocaleDateString('pt-BR')
             };
