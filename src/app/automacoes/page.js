@@ -15,23 +15,36 @@ export default function AutomacoesList() {
     useEffect(() => {
         if (empresaId) {
             fetchRules();
+        } else if (!loadingEmpresa) {
+            // Se terminou de carregar a empresa e não achou ID, libera o loading pra mostrar erro
+            setLoading(false);
         }
-    }, [empresaId]);
+    }, [empresaId, loadingEmpresa]);
 
     const fetchRules = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('automation_rules')
-            .select('*')
-            .eq('empresa_id', empresaId)
-            .order('created_at', { ascending: false });
+        try {
+            const { data, error } = await supabase
+                .from('automation_rules')
+                .select('*')
+                .eq('empresa_id', empresaId)
+                .order('created_at', { ascending: false });
 
-        if (data) setRules(data);
-        if (error) console.error("Erro ao buscar regras:", error);
-        setLoading(false);
+            if (error) {
+                console.error("Erro Supabase:", error);
+                alert("Erro ao buscar automações: " + error.message);
+            }
+            if (data) setRules(data);
+        } catch (err) {
+            console.error("Erro catastrófico:", err);
+            alert("Erro inesperado ao carregar fluxos.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     const toggleRuleActive = async (id, currentStatus) => {
+        if (!empresaId) return alert("Erro: Identificação da empresa não encontrada.");
         const { error } = await supabase
             .from('automation_rules')
             .update({ is_active: !currentStatus })
@@ -41,11 +54,12 @@ export default function AutomacoesList() {
         if (!error) {
             setRules(rules.map(r => r.id === id ? { ...r, is_active: !currentStatus } : r));
         } else {
-            alert('Falha ao alterar status da regra.');
+            alert('Falha ao alterar status da regra: ' + error.message);
         }
     };
 
     const deleteRule = async (id) => {
+        if (!empresaId) return alert("Erro: Identificação da empresa não encontrada.");
         if (!confirm('Tem certeza que deseja apagar permanentemente este fluxo?')) return;
 
         const { error } = await supabase
@@ -57,12 +71,15 @@ export default function AutomacoesList() {
         if (!error) {
             setRules(rules.filter(r => r.id !== id));
         } else {
-            alert('Falha ao excluir o fluxo.');
+            alert('Falha ao excluir o fluxo: ' + error.message);
         }
     };
 
     const handleCreateNew = async () => {
-        if (!empresaId) return;
+        if (!empresaId) {
+            alert("Erro crítico: Não foi possível identificar sua Barbearia/Empresa. Tente fazer logout e login novamente.");
+            return;
+        }
 
         const newRuleName = prompt("Qual o nome do novo Fluxo de Automação?");
         if (!newRuleName) return;
@@ -84,7 +101,7 @@ export default function AutomacoesList() {
             .single();
 
         if (error) {
-            alert('Erro ao criar fluxo.' + error.message);
+            alert('Erro ao criar fluxo: ' + error.message);
             return;
         }
 
@@ -97,6 +114,25 @@ export default function AutomacoesList() {
                 <header className="page-header">
                     <h1>Carregando Automações...</h1>
                 </header>
+            </div>
+        );
+    }
+
+    if (!empresaId && !loadingEmpresa) {
+        return (
+            <div className="pipeline-container">
+                <header className="page-header">
+                    <h1>Ops! Algo deu errado.</h1>
+                </header>
+                <div className="glass-panel" style={{ textAlign: 'center', padding: '64px 32px' }}>
+                    <h3 style={{ marginBottom: '16px', color: '#ef4444' }}>Identificação da Empresa Não Encontrada</h3>
+                    <p className="text-muted" style={{ marginBottom: '24px' }}>
+                        Não conseguimos vincular sua conta a uma Barbearia. <br />
+                        Isso acontece se o seu cadastro estiver incompleto no sistema multi-tenant.
+                    </p>
+                    <button onClick={() => window.location.reload()} className="brand-button">Tentar Novamente</button>
+                    <button onClick={() => router.push('/login')} className="brand-button" style={{ marginLeft: '12px', background: 'transparent', border: '1px solid var(--border-subtle)' }}>Ir para Login</button>
+                </div>
             </div>
         );
     }
