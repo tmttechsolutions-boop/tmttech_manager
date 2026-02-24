@@ -31,6 +31,10 @@ export default function Sidebar() {
                     <span className="nav-icon">⚡</span>
                     <span className="nav-text">Automações</span>
                 </Link>
+                <Link href="/conectar" className={`nav-item ${pathname === '/conectar' ? 'active' : ''}`}>
+                    <span className="nav-icon" style={{ color: '#22c55e' }}>📱</span>
+                    <span className="nav-text">Conectar WhatsApp</span>
+                </Link>
                 <Link href="/configuracoes" className={`nav-item ${pathname === '/configuracoes' ? 'active' : ''}`}>
                     <span className="nav-icon">⚙️</span>
                     <span className="nav-text">Configurações</span>
