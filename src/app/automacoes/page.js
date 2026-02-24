@@ -77,7 +77,7 @@ export default function AutomacoesList() {
 
     const handleCreateNew = async () => {
         if (!empresaId) {
-            alert("Erro crítico: Não foi possível identificar sua Barbearia/Empresa. Tente fazer logout e login novamente.");
+            alert("Erro crítico: Não foi possível identificar seu Negócio/Empresa. Tente fazer logout e login novamente.");
             return;
         }
 
@@ -127,7 +127,7 @@ export default function AutomacoesList() {
                 <div className="glass-panel" style={{ textAlign: 'center', padding: '64px 32px' }}>
                     <h3 style={{ marginBottom: '16px', color: '#ef4444' }}>Identificação da Empresa Não Encontrada</h3>
                     <p className="text-muted" style={{ marginBottom: '24px' }}>
-                        Não conseguimos vincular sua conta a uma Barbearia. <br />
+                        Não conseguimos vincular sua conta a uma Empresa. <br />
                         Isso acontece se o seu cadastro estiver incompleto no sistema multi-tenant.
                     </p>
                     <button onClick={() => window.location.reload()} className="brand-button">Tentar Novamente</button>

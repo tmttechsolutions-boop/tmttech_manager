@@ -315,7 +315,7 @@ const FlowArea = () => {
                                     rows={6}
                                     value={selectedNode.data.message || ''}
                                     onChange={(e) => updateNodeData(selectedNode.id, { message: e.target.value })}
-                                    placeholder="Nossa barbearia agradece..."
+                                    placeholder="Escreva sua mensagem aqui..."
                                 />
                             </div>
                         </div>

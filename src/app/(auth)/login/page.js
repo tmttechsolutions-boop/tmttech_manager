@@ -64,7 +64,7 @@ export default async function LoginPage({ searchParams }) {
                         🚀
                     </div>
                     <h1 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>TMT Tech Manager</h1>
-                    <p className="text-muted" style={{ fontSize: '0.9rem' }}>Faça login na sua agência</p>
+                    <p className="text-muted" style={{ fontSize: '0.9rem' }}>Faça login no seu painel</p>
                 </div>
 
                 {message && (
@@ -76,12 +76,12 @@ export default async function LoginPage({ searchParams }) {
                 <form style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
                     <div className="form-group">
-                        <label>Nome da Barbearia (Apenas Cadastro)</label>
+                        <label>Nome da Empresa (Apenas Cadastro)</label>
                         <input
                             type="text"
                             name="nomeEmpresa"
                             className="form-input"
-                            placeholder="Ex: Barbearia do João"
+                            placeholder="Ex: Minha Empresa"
                         />
                     </div>
 

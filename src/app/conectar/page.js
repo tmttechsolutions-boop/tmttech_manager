@@ -88,7 +88,7 @@ export default function ConectarWhatsApp() {
             <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h1>Conectar WhatsApp (Evolution API)</h1>
-                    <p className="text-muted">Geração de QR Code isolado para a sua Barbearia/Agência.</p>
+                    <p className="text-muted">Geração de QR Code isolado para o seu Negócio/Empresa.</p>
                 </div>
                 <button onClick={() => setShowHelp(!showHelp)} className="brand-button" style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
                     ℹ️ Como Funciona?
@@ -138,7 +138,7 @@ export default function ConectarWhatsApp() {
                         {!qrCode ? (
                             <div>
                                 <p className="text-muted" style={{ marginBottom: '20px' }}>
-                                    Clique no botão abaixo para gerar uma nova sessão de QR Code e vincular o número de atendimento da sua Barbearia ao CRM.
+                                    Clique no botão abaixo para gerar uma nova sessão de QR Code e vincular o seu número de atendimento ao CRM.
                                 </p>
                                 <button onClick={generateQRCode} disabled={loading} className="brand-button" style={{ padding: '12px 24px', fontSize: '1rem' }}>
                                     {loading ? 'Preparando...' : '📷 Gerar QR Code'}
