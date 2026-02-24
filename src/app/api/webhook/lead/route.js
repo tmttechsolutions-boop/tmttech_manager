@@ -16,8 +16,8 @@ export async function POST(req) {
         const { data: newLead, error } = await supabase
             .from('leads')
             .insert([{
-                name,
-                phone,
+                nome: name,
+                telefone: phone,
                 status: 'novo',
                 source: source || 'webhook'
             }])

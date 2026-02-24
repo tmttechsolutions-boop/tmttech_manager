@@ -16,13 +16,13 @@ export async function POST(req) {
         let { data: lead, error: leadError } = await supabase
             .from('leads')
             .select('id')
-            .eq('phone', phone)
+            .eq('telefone', phone)
             .single();
 
         if (!lead) {
             const { data: newLead, error } = await supabase
                 .from('leads')
-                .insert([{ name, phone, status: 'agendado' }])
+                .insert([{ nome: name, telefone: phone, status: 'agendado' }])
                 .select()
                 .single();
 

@@ -40,7 +40,7 @@ export default function Dashboard() {
       let { data: existingLead } = await supabase
         .from('leads')
         .select('id')
-        .eq('phone', newLead.phone)
+        .eq('telefone', newLead.phone)
         .maybeSingle();
 
       let leadId = null;
@@ -51,7 +51,7 @@ export default function Dashboard() {
         // Se não existir, cria
         const { data: leadReq, error: leadErr } = await supabase
           .from('leads')
-          .insert([{ name: newLead.name, phone: newLead.phone, status: 'novo' }])
+          .insert([{ nome: newLead.name, telefone: newLead.phone, status: 'novo' }])
           .select()
           .single();
 

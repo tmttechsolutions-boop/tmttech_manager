@@ -23,14 +23,14 @@ export async function POST(req) {
         let { data: lead } = await supabase
             .from('leads')
             .select('*')
-            .eq('phone', phone)
+            .eq('telefone', phone)
             .single();
 
         // Se o lead não existe, cadastra ele automaticamente como novo!
         if (!lead) {
             const { data: newLead } = await supabase
                 .from('leads')
-                .insert([{ name: `Contato ${phone.slice(-4)}`, phone, status: 'novo' }])
+                .insert([{ nome: `Contato ${phone.slice(-4)}`, telefone: phone, status: 'novo' }])
                 .select()
                 .single();
             lead = newLead;
@@ -90,14 +90,14 @@ export async function POST(req) {
                 if (!logExistente || rule.trigger_type === 'palavra_chave') {
                     // Monta a mensagem final
                     let mensagemFinal = rule.message_template
-                        .replace('{{nome}}', lead.name)
+                        .replace('{{nome}}', lead.nome)
                         .replace('{{servico}}', 'seu serviço')
                         .replace('{{hora}}', 'em breve');
 
                     // AQUI NÓS DISPARAMOS PARA A EVOLUTION API REAL!
                     console.log(`\n================================`);
                     console.log(`🤖 [DISPARO AUTOMÁTICO - REGRA: ${rule.trigger_type}]`);
-                    await sendWhatsAppMessage(lead.phone, mensagemFinal);
+                    await sendWhatsAppMessage(lead.telefone, mensagemFinal);
                     console.log(`================================\n`);
 
                     // Registra logs
