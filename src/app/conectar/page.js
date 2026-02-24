@@ -9,6 +9,7 @@ export default function ConectarWhatsApp() {
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState("disconnected"); // disconnected, connecting, open
     const [error, setError] = useState("");
+    const [showHelp, setShowHelp] = useState(false);
 
     useEffect(() => {
         if (empresaId) {
@@ -84,12 +85,29 @@ export default function ConectarWhatsApp() {
 
     return (
         <div className="pipeline-container">
-            <header className="page-header">
+            <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
                     <h1>Conectar WhatsApp (Evolution API)</h1>
                     <p className="text-muted">Geração de QR Code isolado para a sua Barbearia/Agência.</p>
                 </div>
+                <button onClick={() => setShowHelp(!showHelp)} className="brand-button" style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>
+                    ℹ️ Como Funciona?
+                </button>
             </header>
+
+            {showHelp && (
+                <div className="glass-panel mt-4" style={{ maxWidth: '600px', padding: '24px', borderLeft: '4px solid #3b82f6' }}>
+                    <h3 style={{ marginBottom: '16px', color: '#60a5fa' }}>Entendendo a Conexão do seu WhatsApp</h3>
+                    <p style={{ marginBottom: '12px', lineHeight: '1.6' }}>Ao conectar a sua linha ao sistema, o CRM assume o trabalho de um atendente virtual, permitindo os disparos de automações de forma independente.</p>
+
+                    <ul style={{ paddingLeft: '24px', lineHeight: '1.8', marginBottom: '16px' }}>
+                        <li><strong>Passo 1:</strong> Clique em <span style={{ fontWeight: 'bold' }}>"Gerar QR Code"</span>. O motor construirá a sua instância virtual (isolada da matriz) no servidor e o código aparecerá abaixo.</li>
+                        <li><strong>Passo 2:</strong> Abra o WhatsApp do seu negócio no celular, vá em <span style={{ color: '#22c55e', fontWeight: 'bold' }}>Aparelhos Conectados</span>, e aponte a câmera para a tela do computador.</li>
+                        <li><strong>Passo 3:</strong> Aguarde a confirmação de <strong>"Conectado e Pronto"</strong> (pode demorar alguns segundos).</li>
+                    </ul>
+                    <p className="text-muted" style={{ fontSize: '0.85rem' }}>⚠️ Dica: Recomendamos que você utilize um aparelho/número da loja focado no seu atendimento para que quando o Kanban for alterado de uma coluna para a outra, seja este o WhatsApp utilizado. O celular precisa ficar ligado com internet para manter o bot funcional.</p>
+                </div>
+            )}
 
             <div className="glass-panel mt-4" style={{ maxWidth: '600px', padding: '32px' }}>
                 <h2 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>Status da Instância</h2>
