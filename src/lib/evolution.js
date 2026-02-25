@@ -52,11 +52,13 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
             })
         });
 
-        const result = await response.json().catch(() => ({ message: 'Invalid JSON response' }));
+        const result = await response.json().catch(() => ({}));
         console.log(`[EVOLUTION] Result:`, result);
 
         if (!response.ok) {
-            return { success: false, error: result.message || 'Evolution API Error', result };
+            // Se a Evolution devolver uma mensagem amigável, usamos ela
+            const errorMsg = result.message || result.error || (result.response?.message) || 'Erro na API Evolution';
+            return { success: false, error: errorMsg, status: response.status, result };
         }
 
         // Persist outbound message
