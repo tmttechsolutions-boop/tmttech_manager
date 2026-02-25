@@ -13,8 +13,12 @@ export async function POST(req) {
         }
 
         const supabase = createSupabaseClient();
-        const { data: empData } = await supabase.from('empresas').select('whatsapp_instance').eq('id', empresaId).single();
+        const { data: empData, error: empErr } = await supabase.from('empresas').select('whatsapp_instance').eq('id', empresaId).single();
 
+        if (empErr) {
+            console.error("Erro ao buscar empresa:", empErr);
+            return NextResponse.json({ error: `Erro DB: ${empErr.message}`, state: 'disconnected' }, { status: 500 });
+        }
         // Nome único para a instância no servidor da Evolution API
         const instanceName = empData?.whatsapp_instance || `tmttech_${empresaId}`;
 

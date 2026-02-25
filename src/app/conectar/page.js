@@ -26,15 +26,27 @@ export default function ConectarWhatsApp() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ empresaId, action: 'status' })
             });
-            const data = await res.json();
+
+            const data = await res.json().catch(() => ({ error: 'Resposta inválida do servidor' }));
+
+            if (!res.ok) {
+                setError(`Erro API (${res.status}): ${data.error || 'Falha desconhecida'}`);
+                setInstanceName("Erro na Requisição");
+                return;
+            }
+
             if (data.state) {
                 setStatus(data.state);
             }
             if (data.instanceName) {
                 setInstanceName(data.instanceName);
+            } else {
+                setInstanceName("Instância não configurada");
             }
         } catch (err) {
             console.error("Erro ao verificar status:", err);
+            setError(`Erro de Conectividade: ${err.message}`);
+            setInstanceName("Falha de Rede");
         }
     };
 
