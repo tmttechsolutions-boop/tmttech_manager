@@ -23,21 +23,27 @@ export async function GET() {
                 globalTest = {
                     status: res.status,
                     ok: res.ok,
-                    body: await res.json().catch(() => "Not JSON")
+                    data_received: res.ok
                 };
             } catch (e) {
                 globalTest = { error: e.message };
             }
         }
 
+        const instanceMapping = empresas?.map(e => ({
+            empresa: e.nome,
+            id: e.id,
+            whatsapp_instance: e.whatsapp_instance,
+            resolved_instance: e.whatsapp_instance || `tmttech_${e.id}`
+        })) || [];
+
         return NextResponse.json({
-            debug_v: '1.4-auth-check',
-            empresas_count: empresas?.length || 0,
-            env: {
-                has_url: !!EVOLUTION_API_URL,
-                url: EVOLUTION_API_URL,
+            debug_v: '1.5-mapping-check',
+            env_vars: {
+                EVOLUTION_API_URL,
                 key_fragment: EVOLUTION_API_KEY ? `${EVOLUTION_API_KEY.slice(0, 5)}...${EVOLUTION_API_KEY.slice(-5)}` : 'MISSING'
             },
+            instanceMapping,
             globalTest,
             db_error: empError?.message || null
         });
