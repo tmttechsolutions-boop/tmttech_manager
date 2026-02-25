@@ -13,20 +13,27 @@ export async function GET() {
         const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
         const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
-        // Teste de conexão Global (Listar Instâncias)
-        let globalTest = {};
+        // Teste de conexão Global com múltiplos headers
+        let authTests = {};
         if (EVOLUTION_API_URL && EVOLUTION_API_KEY) {
-            try {
-                const res = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
-                    headers: { 'apikey': EVOLUTION_API_KEY }
-                });
-                globalTest = {
-                    status: res.status,
-                    ok: res.ok,
-                    data_received: res.ok
-                };
-            } catch (e) {
-                globalTest = { error: e.message };
+            const testEndpoints = [
+                { name: 'Header: apikey', headers: { 'apikey': EVOLUTION_API_KEY } },
+                { name: 'Header: apiKey', headers: { 'apiKey': EVOLUTION_API_KEY } },
+                { name: 'Header: Authorization', headers: { 'Authorization': `Bearer ${EVOLUTION_API_KEY}` } }
+            ];
+
+            for (const test of testEndpoints) {
+                try {
+                    const res = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
+                        headers: test.headers
+                    });
+                    authTests[test.name] = {
+                        status: res.status,
+                        ok: res.ok
+                    };
+                } catch (e) {
+                    authTests[test.name] = { error: e.message };
+                }
             }
         }
 
@@ -38,13 +45,13 @@ export async function GET() {
         })) || [];
 
         return NextResponse.json({
-            debug_v: '1.5-mapping-check',
+            debug_v: '1.6-auth-multitest',
             env_vars: {
                 EVOLUTION_API_URL,
                 key_fragment: EVOLUTION_API_KEY ? `${EVOLUTION_API_KEY.slice(0, 5)}...${EVOLUTION_API_KEY.slice(-5)}` : 'MISSING'
             },
             instanceMapping,
-            globalTest,
+            authTests,
             db_error: empError?.message || null
         });
     } catch (err) {
