@@ -99,7 +99,8 @@ export default function ChatPage() {
             if (res.ok) {
                 setNewMessage("");
             } else {
-                alert("Falha ao enviar mensagem.");
+                const errData = await res.json().catch(() => ({}));
+                alert(`Falha ao enviar: ${errData.error || 'Erro desconhecido no servidor'}`);
             }
         } catch (err) {
             console.error(err);
