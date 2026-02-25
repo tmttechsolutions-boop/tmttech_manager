@@ -130,11 +130,12 @@ export default function ConectarWhatsApp() {
                         </span>
                     </div>
                 </div>
-                {instanceName && (
-                    <div className="mb-4" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Instância Monitorada: <strong>{instanceName}</strong>
-                    </div>
-                )}
+
+                <div className="mb-4" style={{ fontSize: '0.8rem', color: 'var(--text-muted)', background: 'rgba(0,0,0,0.1)', padding: '8px', borderRadius: '4px' }}>
+                    Instância Monitorada: <strong style={{ color: 'var(--brand-purple-light)' }}>{instanceName || "Carregando..."}</strong>
+                    <br />
+                    <small style={{ opacity: 0.5 }}>Versão do Sistema: 1.1 (Multi-tenant Fix)</small>
+                </div>
                 {error && (
                     <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', marginBottom: '24px', fontSize: '0.85rem' }}>
                         {error}
