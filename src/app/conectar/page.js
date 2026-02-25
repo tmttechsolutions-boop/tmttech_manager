@@ -91,7 +91,7 @@ export default function ConectarWhatsApp() {
         <div className="pipeline-container">
             <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
-                    <h1>Conectar WhatsApp (Evolution API)</h1>
+                    <h1>Conectar WhatsApp v1.1</h1>
                     <p className="text-muted">Geração de QR Code isolado para o seu Negócio/Empresa.</p>
                 </div>
                 <button onClick={() => setShowHelp(!showHelp)} className="brand-button" style={{ background: 'transparent', border: '1px solid var(--border-subtle)', color: 'var(--text-primary)' }}>

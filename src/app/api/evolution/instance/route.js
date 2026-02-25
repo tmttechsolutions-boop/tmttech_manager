@@ -82,7 +82,10 @@ export async function POST(req) {
             });
 
             if (!statusResponse.ok) {
-                return NextResponse.json({ state: 'disconnected' }, { status: 200 });
+                return NextResponse.json({
+                    state: 'disconnected',
+                    instanceName: instanceName
+                }, { status: 200 });
             }
 
             const statusData = await statusResponse.json();
