@@ -1,0 +1,4 @@
+CRM Version: 1.3 Stable
+Deployed: 2026-02-24 22:18
+Status: Multi-tenant Support Enabled
+Instance: tmttech_manager configured
