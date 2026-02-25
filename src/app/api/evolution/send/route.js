@@ -8,9 +8,8 @@ export async function POST(req) {
         if (!empresaId || !phone || !text) {
             return NextResponse.json({ error: 'Dados incompletos' }, { status: 400 });
         }
-
-        // A função sendWhatsAppMessage no lib/evolution já cuida do disparo e do log no banco
-        const result = await sendWhatsAppMessage(phone, text);
+        // A função sendWhatsAppMessage no lib/evolution agora aceita empresaId para rotear para a instância certa
+        const result = await sendWhatsAppMessage(phone, text, empresaId);
 
         if (!result.success) {
             return NextResponse.json({ error: result.error }, { status: 500 });

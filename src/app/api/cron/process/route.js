@@ -65,7 +65,7 @@ export async function GET(req) {
                         // leremos 'rule.empresa_id' para disparar do WhatsApp correto.
                         // ============================================
                         console.log(`[DISPARO CRON WHATSAPP] Para: ${ag.leads.telefone} -> Mensagem: ${mensagemFinal}`);
-                        await sendWhatsAppMessage(ag.leads.telefone, mensagemFinal);
+                        await sendWhatsAppMessage(ag.leads.telefone, mensagemFinal, rule.empresa_id);
 
                         // Registra no Log isolado por Empresa que a mensagem foi enviada
                         await supabase.from('message_logs').insert([{

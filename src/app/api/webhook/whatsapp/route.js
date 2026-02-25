@@ -116,7 +116,7 @@ export async function POST(req) {
                     // AQUI NÓS DISPARAMOS PARA A EVOLUTION API REAL!
                     console.log(`\n================================`);
                     console.log(`🤖 [DISPARO AUTOMÁTICO - REGRA: ${rule.trigger_type}]`);
-                    await sendWhatsAppMessage(lead.telefone, mensagemFinal);
+                    await sendWhatsAppMessage(lead.telefone, mensagemFinal, empresaId);
                     console.log(`================================\n`);
 
                     // Registra log isolado por conta no webhook de resposta

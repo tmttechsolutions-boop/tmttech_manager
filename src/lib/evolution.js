@@ -7,16 +7,38 @@ const EVOLUTION_INSTANCE = process.env.EVOLUTION_INSTANCE_NAME;
  * Envia uma mensagem de texto simples via WhatsApp usando a Evolution API.
  * @param {string} phone - O número de telefone com DDI (Ex: 5511999999999)
  * @param {string} text - O conteúdo da mensagem
+ * @param {string} empresaId - O ID da empresa para identificar a instância (OPCIONAL se vier via DB)
  */
-export async function sendWhatsAppMessage(phone, text) {
-    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY || !EVOLUTION_INSTANCE) {
+export async function sendWhatsAppMessage(phone, text, empresaId = null) {
+    // Se não passar empresaId, tentamos pegar do lead no banco depois, 
+    // mas para o endpoint inicial precisamos de um nome de instância.
+
+    if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
         console.warn("⚠️ Chaves da Evolution API não configuradas no .env.local. Disparo Simulado:");
         console.log(`[SIMULAÇÃO WA] Para: ${phone} -> ${text}`);
         return { success: true, simulated: true };
     }
 
     try {
-        const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
+        const { createSupabaseClient } = require('./supabase');
+        const supabase = createSupabaseClient();
+
+        let targetEmpresaId = empresaId;
+
+        // Se o empresaId não foi passado, buscamos no lead pelo telefone
+        if (!targetEmpresaId) {
+            const { data: lead } = await supabase.from('leads').select('empresa_id').eq('telefone', phone).single();
+            if (lead) targetEmpresaId = lead.empresa_id;
+        }
+
+        // Se ainda assim não tiver empresaId, usamos a instância global (legado) ou falhamos
+        const instanceName = targetEmpresaId ? `tmttech_${targetEmpresaId}` : EVOLUTION_INSTANCE;
+
+        if (!instanceName) {
+            throw new Error("Não foi possível determinar a instância da Evolution API.");
+        }
+
+        const endpoint = `${EVOLUTION_API_URL}/message/sendText/${instanceName}`;
         // A Evolution API geralmente exige que o número tenha a formatação correta.
         const cleanPhone = phone.replace(/\D/g, '');
 
