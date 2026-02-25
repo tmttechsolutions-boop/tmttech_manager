@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createSupabaseClient } from '@/lib/supabase';
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
@@ -11,8 +12,11 @@ export async function POST(req) {
             return NextResponse.json({ error: 'ID da Empresa não fornecido.' }, { status: 400 });
         }
 
+        const supabase = createSupabaseClient();
+        const { data: empData } = await supabase.from('empresas').select('whatsapp_instance').eq('id', empresaId).single();
+
         // Nome único para a instância no servidor da Evolution API
-        const instanceName = `tmttech_${empresaId}`;
+        const instanceName = empData?.whatsapp_instance || `tmttech_${empresaId}`;
 
         if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
             // Modo SIMULAÇÃO se as chaves não estiverem configuradas

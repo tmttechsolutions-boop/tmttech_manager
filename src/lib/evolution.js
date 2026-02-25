@@ -24,6 +24,7 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
         const supabase = createSupabaseClient();
 
         let targetEmpresaId = empresaId;
+        let customInstance = null;
 
         // Se o empresaId não foi passado, buscamos no lead pelo telefone
         if (!targetEmpresaId) {
@@ -31,8 +32,19 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
             if (lead) targetEmpresaId = lead.empresa_id;
         }
 
-        // Se ainda assim não tiver empresaId, usamos a instância global (legado) ou falhamos
-        const instanceName = targetEmpresaId ? `tmttech_${targetEmpresaId}` : EVOLUTION_INSTANCE;
+        // Busca se existe um nome de instância personalizado no banco para esta empresa
+        if (targetEmpresaId) {
+            const { data: empData } = await supabase.from('empresas').select('whatsapp_instance').eq('id', targetEmpresaId).single();
+            if (empData?.whatsapp_instance) {
+                customInstance = empData.whatsapp_instance;
+            }
+        }
+
+        // Ordem de prioridade:
+        // 1. Instância customizada no banco (whatsapp_instance)
+        // 2. Novo padrão tmttech_{id}
+        // 3. Antigo padrão global do .env
+        const instanceName = customInstance || (targetEmpresaId ? `tmttech_${targetEmpresaId}` : EVOLUTION_INSTANCE);
 
         if (!instanceName) {
             throw new Error("Não foi possível determinar a instância da Evolution API.");
