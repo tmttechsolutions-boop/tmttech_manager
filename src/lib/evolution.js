@@ -54,6 +54,8 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
         // A Evolution API geralmente exige que o número tenha a formatação correta.
         const cleanPhone = phone.replace(/\D/g, '');
 
+        console.log(`[EVOLUTION] Enviando para: ${instanceName} | URL: ${endpoint} | Telefone: ${cleanPhone}`);
+
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -71,6 +73,11 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
         });
 
         const result = await response.json();
+        console.log(`[EVOLUTION] Resultado do Disparo:`, result);
+
+        if (!response.ok) {
+            return { success: false, error: result.message || 'Erro na API Evolution', result };
+        }
 
         // 🟢 PERSISTÊNCIA: Salva no histórico de conversa (Outbound)
         // Importamos dinamicamente para evitar ciclos ou problemas de inicialização
