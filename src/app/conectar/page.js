@@ -7,6 +7,7 @@ export default function ConectarWhatsApp() {
     const { empresaId, loadingEmpresa } = useEmpresa();
     const [qrCode, setQrCode] = useState(null);
     const [loading, setLoading] = useState(false);
+    const [status, setStatus] = useState("disconnected");
     const [error, setError] = useState("");
     const [showHelp, setShowHelp] = useState(false);
     const [instanceName, setInstanceName] = useState("");
