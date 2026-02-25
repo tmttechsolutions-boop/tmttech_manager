@@ -9,15 +9,32 @@ export async function POST(req) {
         const supabase = createSupabaseClient();
         const data = await req.json();
 
-        // 1. Identifica a Empresa através do nome da Instância (tmttech_ID-DA-EMPRESA)
+        // 1. Identifica a Empresa através do nome da Instância
         const instanceName = data.instance || '';
-        const empresaId = instanceName.startsWith('tmttech_') ? instanceName.split('_')[1] : null;
+        let empresaId = null;
 
-        if (!empresaId) {
-            console.warn("[WHATSAPP WEBHOOK] Instância não identificada ou sem empresa_id vinculado.");
-            return NextResponse.json({ message: 'Instância não mapeada.' }, { status: 200 });
+        // Tenta buscar a empresa que possui este nome de instância configurado
+        const { data: empData } = await supabase
+            .from('empresas')
+            .select('id')
+            .eq('whatsapp_instance', instanceName)
+            .maybeSingle();
+
+        if (empData) {
+            empresaId = empData.id;
+        } else if (instanceName.startsWith('tmttech_')) {
+            // Fallback para o padrão tmttech_{ID-DA-EMPRESA}
+            const potentialId = instanceName.split('_')[1];
+            // Verifica se é um UUID válido básico (opcional, mas bom pra segurança)
+            if (potentialId && potentialId.length > 20) {
+                empresaId = potentialId;
+            }
         }
 
+        if (!empresaId) {
+            console.warn(`[WHATSAPP WEBHOOK] Instância "${instanceName}" não identificada ou sem empresa_id vinculado.`);
+            return NextResponse.json({ message: 'Instância não mapeada.' }, { status: 200 });
+        }
         // Supondo uma estrutura genérica ou da Evolution API
         const phone = data.data?.key?.remoteJid?.split('@')[0] || data.phone || '';
         const text = data.data?.message?.conversation || data.data?.message?.extendedTextMessage?.text || data.text || '';
