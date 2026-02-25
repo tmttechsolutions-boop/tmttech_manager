@@ -7,9 +7,9 @@ export default function ConectarWhatsApp() {
     const { empresaId, loadingEmpresa } = useEmpresa();
     const [qrCode, setQrCode] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [status, setStatus] = useState("disconnected"); // disconnected, connecting, open
     const [error, setError] = useState("");
     const [showHelp, setShowHelp] = useState(false);
+    const [instanceName, setInstanceName] = useState("");
 
     useEffect(() => {
         if (empresaId) {
@@ -28,6 +28,9 @@ export default function ConectarWhatsApp() {
             const data = await res.json();
             if (data.state) {
                 setStatus(data.state);
+            }
+            if (data.instanceName) {
+                setInstanceName(data.instanceName);
             }
         } catch (err) {
             console.error("Erro ao verificar status:", err);
@@ -126,7 +129,11 @@ export default function ConectarWhatsApp() {
                         </span>
                     </div>
                 </div>
-
+                {instanceName && (
+                    <div className="mb-4" style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Instância Monitorada: <strong>{instanceName}</strong>
+                    </div>
+                )}
                 {error && (
                     <div style={{ padding: '12px', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', borderRadius: '8px', marginBottom: '24px', fontSize: '0.85rem' }}>
                         {error}

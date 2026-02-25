@@ -10,9 +10,8 @@ BEGIN
 END $$;
 
 -- 2. Tenta recuperar a conexão antiga para a sua empresa principal
--- Substitua 'tmt_manager' pelo nome da instância que aparece como CONECTADA no seu Evolution
 UPDATE public.empresas 
-SET whatsapp_instance = 'tmt_manager' 
+SET whatsapp_instance = 'tmttech_manager' 
 WHERE id = (SELECT id FROM public.empresas ORDER BY created_at ASC LIMIT 1);
 
 -- 3. Recarrega Cache
