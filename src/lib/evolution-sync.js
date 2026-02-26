@@ -60,6 +60,13 @@ export async function syncChatHistory(empresaId, instanceName) {
                 else if (pushNameLast && pushNameLast !== phone) realName = pushNameLast;
             }
 
+            // 2.1 Garante que o Lead existe no banco
+            let { data: lead } = await supabase
+                .from('leads')
+                .select('*')
+                .eq('telefone', phone)
+                .maybeSingle();
+
             if (!lead) {
                 const { data: newLead, error: leadErr } = await supabase
                     .from('leads')
