@@ -51,8 +51,7 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
                 text: text
             })
         });
-        village
-        village
+
 
         const result = await response.json().catch(() => ({}));
 
