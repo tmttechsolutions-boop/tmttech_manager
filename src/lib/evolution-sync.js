@@ -52,15 +52,17 @@ export async function syncChatHistory(empresaId, instanceName) {
             // 2.1 Garante que o Lead existe
             let { data: lead } = await supabase
                 .from('leads')
-                .select('id')
+                .select('*')
                 .eq('telefone', phone)
                 .maybeSingle();
+
+            const realName = chat.name || chat.pushName || "";
 
             if (!lead) {
                 const { data: newLead, error: leadErr } = await supabase
                     .from('leads')
                     .insert([{
-                        nome: chat.name || `Contato ${phone.slice(-4)}`,
+                        nome: realName || `Contato ${phone.slice(-4)}`,
                         telefone: phone,
                         empresa_id: empresaId,
                         status: 'novo'
@@ -74,6 +76,18 @@ export async function syncChatHistory(empresaId, instanceName) {
                 }
                 lead = newLead;
                 results.leadsCreated++;
+            } else if (realName && (lead.nome.startsWith('Contato ') || !lead.nome)) {
+                // Se o lead já existe mas o nome é genérico, atualiza para o nome real do WhatsApp
+                const { data: updatedLead } = await supabase
+                    .from('leads')
+                    .update({ nome: realName })
+                    .eq('id', lead.id)
+                    .select()
+                    .single();
+                if (updatedLead) {
+                    lead = updatedLead;
+                    console.log(`[SYNC] Nome do Lead ${phone} atualizado para: ${realName}`);
+                }
             }
 
             // 2.2 Busca mensagens desse Chat no Evolution

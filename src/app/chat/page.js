@@ -26,7 +26,7 @@ export default function ChatPage() {
         if (empresaId) {
             fetchActiveChats();
 
-            // Inscreve no Realtime para NOVOS LEADS (Novas conversas que chegam)
+            // Inscreve no Realtime para NOVOS LEADS e ATUALIZAÇÕES (Nomes, etc)
             const leadChannel = supabase
                 .channel('public:leads')
                 .on('postgres_changes', {
@@ -36,6 +36,18 @@ export default function ChatPage() {
                     filter: `empresa_id=eq.${empresaId}`
                 }, (payload) => {
                     setLeads(prev => [payload.new, ...prev]);
+                })
+                .on('postgres_changes', {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'leads',
+                    filter: `empresa_id=eq.${empresaId}`
+                }, (payload) => {
+                    // Atualiza o lead na lista local se ele já existir
+                    setLeads(prev => prev.map(lead => lead.id === payload.new.id ? { ...lead, ...payload.new } : lead));
+
+                    // Se o lead selecionado for o que foi atualizado, atualiza ele também
+                    setSelectedLead(current => (current && current.id === payload.new.id) ? { ...current, ...payload.new } : current);
                 })
                 .subscribe();
 
