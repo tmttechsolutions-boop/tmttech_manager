@@ -36,35 +36,42 @@ export async function POST(req) {
             return NextResponse.json({ message: 'Instância não mapeada.' }, { status: 200 });
         }
         // 2. Extrai dados básicos
+        const remoteJid = data.data?.key?.remoteJid || '';
         const isFromMe = data.data?.key?.fromMe === true;
-        const phone = data.data?.key?.remoteJid?.split('@')[0] || data.phone || '';
+        const isGroup = remoteJid.includes('@g.us');
+
+        const phone = remoteJid.split('@')[0] || data.phone || '';
         const text = data.data?.message?.conversation || data.data?.message?.extendedTextMessage?.text || data.text || '';
         const isReplyStory = data.type === 'story_reply' || data.data?.message?.extendedTextMessage?.contextInfo?.isForwarded === false;
 
-        // SEGURANÇA: ignora se for uma mensagem enviada por nós mesmos (evita loop infinito)
-        if (isFromMe) {
-            console.log(`[WHATSAPP WEBHOOK] Ignorando mensagem disparada pelo próprio bot.`);
-            return NextResponse.json({ message: 'Ignore: message from me' }, { status: 200 });
+        // FILTRO: Ignora mensagens de grupos para não poluir o CRM
+        if (isGroup) {
+            return NextResponse.json({ message: 'Ignore: group message' }, { status: 200 });
         }
 
         if (!phone || !text) {
             return NextResponse.json({ message: 'Mensagem vazia ou sem remetente ou é um evento interno ignorado.' }, { status: 200 });
         }
 
-        console.log(`[WHATSAPP WEBHOOK] Mensagem Recebida de ${phone}: "${text}"`);
+        console.log(`[WHATSAPP WEBHOOK] Processando mensagem de ${phone} (fromMe: ${isFromMe}): "${text.substring(0, 30)}..."`);
 
         // 1. Tenta achar quem é esse lead no banco.
         let { data: lead } = await supabase
             .from('leads')
             .select('*')
             .eq('telefone', phone)
-            .single();
+            .maybeSingle();
 
         // Se o lead não existe, cadastra ele automaticamente como novo!
         if (!lead) {
             const { data: newLead, error: insertError } = await supabase
                 .from('leads')
-                .insert([{ nome: `Contato ${phone.slice(-4)}`, telefone: phone, status: 'novo', empresa_id: empresaId }])
+                .insert([{
+                    nome: `Contato ${phone.slice(-4)}`,
+                    telefone: phone,
+                    status: 'novo',
+                    empresa_id: empresaId
+                }])
                 .select()
                 .single();
 
@@ -81,13 +88,20 @@ export async function POST(req) {
         }
 
         // 3. PERSISTÊNCIA: Salva esta mensagem no histórico de CHAT (Visível na UI de Chat)
+        // Se for 'fromMe', a direção é 'outbound'. Se não, é 'inbound'.
         await supabase.from('chat_messages').insert([{
             empresa_id: empresaId,
             lead_id: lead.id,
-            direction: 'inbound',
+            direction: isFromMe ? 'outbound' : 'inbound',
             content: text,
             message_type: 'text'
         }]);
+
+        // SEGURANÇA: Se a mensagem foi enviada POR NÓS (fromMe), paramos aqui.
+        // Não queremos que o bot responda a si mesmo (evita loop infinito).
+        if (isFromMe) {
+            return NextResponse.json({ message: 'Persisted outbound message from phone' }, { status: 200 });
+        }
 
         // ==========================================
         // MOTOR DE REGRAS (MANYCHAT CLONE)

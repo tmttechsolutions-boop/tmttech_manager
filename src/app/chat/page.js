@@ -23,6 +23,23 @@ export default function ChatPage() {
     useEffect(() => {
         if (empresaId) {
             fetchActiveChats();
+
+            // Inscreve no Realtime para NOVOS LEADS (Novas conversas que chegam)
+            const leadChannel = supabase
+                .channel('public:leads')
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'leads',
+                    filter: `empresa_id=eq.${empresaId}`
+                }, (payload) => {
+                    setLeads(prev => [payload.new, ...prev]);
+                })
+                .subscribe();
+
+            return () => {
+                supabase.removeChannel(leadChannel);
+            };
         }
     }, [empresaId]);
 
@@ -53,6 +70,7 @@ export default function ChatPage() {
     const fetchActiveChats = async () => {
         setLoadingLeads(true);
         // Busca leads que já possuem alguma mensagem ou estão no sistema
+        // Ordenamos por ID descendente para os mais novos (ou criados recentemente) ficarem no topo
         const { data, error } = await supabase
             .from('leads')
             .select(`
@@ -60,10 +78,9 @@ export default function ChatPage() {
                 chat_messages(content, created_at)
             `)
             .eq('empresa_id', empresaId)
-            .order('nome');
+            .order('created_at', { ascending: false });
 
         if (data) {
-            // Ordenar por última mensagem ou nome
             setLeads(data);
         }
         setLoadingLeads(false);
@@ -117,7 +134,16 @@ export default function ChatPage() {
             {/* Sidebar de Contatos */}
             <div className="chat-contacts-sidebar" style={{ width: '350px', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.2)' }}>
                 <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <h2 style={{ fontSize: '1.2rem' }}>Conversas</h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h2 style={{ fontSize: '1.2rem' }}>Conversas</h2>
+                        <button
+                            onClick={fetchActiveChats}
+                            style={{ background: 'none', border: 'none', color: 'var(--brand-purple)', cursor: 'pointer', fontSize: '0.8rem' }}
+                            title="Atualizar lista"
+                        >
+                            🔄 Atualizar
+                        </button>
+                    </div>
                     <input type="text" placeholder="Buscar contato..." className="form-input mt-4" style={{ fontSize: '0.85rem' }} />
                 </div>
 
