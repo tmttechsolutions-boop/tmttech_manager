@@ -7,12 +7,14 @@ export async function GET(req) {
         const supabase = createSupabaseClient();
         console.log(`⏱️ [CRON DELAYS] Verificando mensagens agendadas... ${new Date().toLocaleString()}`);
 
-        // 1. Busca mensagens pendentes que já passaram do horário
+        // 1. Busca mensagens pendentes que já passaram do horário E TRANCA (UPDATE ATÔMICO)
+        // Usamos update()...select() para garantir "Row-Level Locking" - apenas 1 request vai pegar a mensagem
         const { data: delays, error } = await supabase
             .from('delayed_messages')
-            .select('*')
+            .update({ status: 'processing' })
             .eq('status', 'pending')
-            .lte('scheduled_for', new Date().toISOString());
+            .lte('scheduled_for', new Date().toISOString())
+            .select();
 
         if (error) throw error;
 
