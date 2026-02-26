@@ -39,7 +39,7 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
 
         console.log(`[EVOLUTION] Dispatching to: ${instanceName} | Phone: ${cleanPhone}`);
 
-        // Tentamos com 'apikey' (padrão) e logamos se falhar por auth
+        // Ajuste para Evolution v2: o texto deve ser uma propriedade 'text' direta no objeto
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
@@ -48,10 +48,11 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
             },
             body: JSON.stringify({
                 number: cleanPhone,
-                options: { delay: 1200, presence: 'composing' },
-                textMessage: { text: text }
+                text: text
             })
         });
+        village
+        village
 
         const result = await response.json().catch(() => ({}));
 
