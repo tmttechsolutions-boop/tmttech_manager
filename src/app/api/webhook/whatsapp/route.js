@@ -10,7 +10,7 @@ export async function POST(req) {
         const data = await req.json();
 
         // 1. Identifica a Empresa através do nome da Instância
-        const instanceName = data.instance || '';
+        const instanceName = data.instance || data.instanceName || '';
         let empresaId = null;
 
         // Tenta buscar a empresa que possui este nome de instância configurado
@@ -22,17 +22,28 @@ export async function POST(req) {
 
         if (empData) {
             empresaId = empData.id;
-        } else if (instanceName.startsWith('tmttech_')) {
-            // Fallback para o padrão tmttech_{ID-DA-EMPRESA}
-            const potentialId = instanceName.split('_')[1];
-            // Verifica se é um UUID válido básico (opcional, mas bom pra segurança)
-            if (potentialId && potentialId.length > 20) {
-                empresaId = potentialId;
+        } else {
+            // FALLBACK 1: Tenta padrão tmttech_{ID}
+            if (instanceName.startsWith('tmttech_')) {
+                const potentialId = instanceName.split('_')[1];
+                if (potentialId && potentialId.length > 20) {
+                    empresaId = potentialId;
+                }
+            }
+
+            // FALLBACK 2: Se ainda não achou, pega a PRIMEIRA empresa do banco (se houver apenas uma)
+            // Isso garante que para instalações simples, o webhook nunca "perca" a mensagem
+            if (!empresaId) {
+                const { data: allEmp } = await supabase.from('empresas').select('id').limit(2);
+                if (allEmp && allEmp.length === 1) {
+                    empresaId = allEmp[0].id;
+                    console.log(`[WHATSAPP WEBHOOK] Usando fallback para única empresa cadastrada: ${empresaId}`);
+                }
             }
         }
 
         if (!empresaId) {
-            console.warn(`[WHATSAPP WEBHOOK] Instância "${instanceName}" não identificada ou sem empresa_id vinculado.`);
+            console.warn(`[WHATSAPP WEBHOOK] Instância "${instanceName}" não identificada. Payload:`, JSON.stringify(data).substring(0, 200));
             return NextResponse.json({ message: 'Instância não mapeada.' }, { status: 200 });
         }
         // 2. Extrai dados básicos
@@ -41,6 +52,7 @@ export async function POST(req) {
         const isGroup = remoteJid.includes('@g.us');
 
         const phone = remoteJid.split('@')[0] || data.phone || '';
+        const pushName = data.pushName || data.data?.pushName || '';
         const text = data.data?.message?.conversation || data.data?.message?.extendedTextMessage?.text || data.text || '';
         const isReplyStory = data.type === 'story_reply' || data.data?.message?.extendedTextMessage?.contextInfo?.isForwarded === false;
 
@@ -53,7 +65,7 @@ export async function POST(req) {
             return NextResponse.json({ message: 'Mensagem vazia ou sem remetente ou é um evento interno ignorado.' }, { status: 200 });
         }
 
-        console.log(`[WHATSAPP WEBHOOK] Processando mensagem de ${phone} (fromMe: ${isFromMe}): "${text.substring(0, 30)}..."`);
+        console.log(`[WHATSAPP WEBHOOK] Processando mensagem de "${pushName}" (${phone}) (fromMe: ${isFromMe}): "${text.substring(0, 30)}..."`);
 
         // 1. Tenta achar quem é esse lead no banco.
         let { data: lead } = await supabase
@@ -64,10 +76,11 @@ export async function POST(req) {
 
         // Se o lead não existe, cadastra ele automaticamente como novo!
         if (!lead) {
+            const finalName = pushName || `Contato ${phone.slice(-4)}`;
             const { data: newLead, error: insertError } = await supabase
                 .from('leads')
                 .insert([{
-                    nome: `Contato ${phone.slice(-4)}`,
+                    nome: finalName,
                     telefone: phone,
                     status: 'novo',
                     empresa_id: empresaId
@@ -80,6 +93,15 @@ export async function POST(req) {
                 return NextResponse.json({ message: 'Falha ao processar novo contato.' }, { status: 200 });
             }
             lead = newLead;
+        } else if (pushName && lead.nome.startsWith('Contato ')) {
+            // Pequena melhoria: se o lead já existia mas com nome genérico, e agora temos o pushName, atualiza!
+            const { data: updatedLead } = await supabase
+                .from('leads')
+                .update({ nome: pushName })
+                .eq('id', lead.id)
+                .select()
+                .single();
+            if (updatedLead) lead = updatedLead;
         }
 
         if (!lead) {
@@ -181,9 +203,13 @@ export async function POST(req) {
 
                     // DISPAROS
                     for (const rawMsg of mensagensParaEnviar) {
+                        // SUBSTITUIÇÃO DE VARIÁVEIS ROBUSTA
                         let mensagemFinal = rawMsg
                             .replace(/{{nome}}/g, lead.nome || 'cliente')
-                            .replace(/{{telefone}}/g, phone);
+                            .replace(/{nome}/g, lead.nome || 'cliente')
+                            .replace(/{Nome do contato}/g, lead.nome || 'cliente')
+                            .replace(/{{telefone}}/g, phone)
+                            .replace(/{telefone}/g, phone);
 
                         console.log(`🤖 [AUTOMAÇÃO] Disparando para ${phone} via Regra: "${rule.name || rule.trigger_type}"`);
                         const dispatch = await sendWhatsAppMessage(phone, mensagemFinal, empresaId);
