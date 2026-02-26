@@ -170,16 +170,34 @@ export async function POST(req) {
             }
 
             if (deveDisparar) {
-                // Prevenção de Loop / Repetição Excessiva
+                // Prevenção de Loop / Repetição Excessiva (Lógica de Sessão ManyChat)
                 const { data: logExistente } = await supabase
                     .from('message_logs')
-                    .select('id')
+                    .select('created_at')
                     .eq('rule_id', rule.id)
                     .eq('lead_id', lead.id)
-                    .single();
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
 
-                // Permitimos repetir palavra-chave, mas "qualquer mensagem" apenas uma vez por lead (padrão boas vindas)
+                let canTrigger = false;
                 if (!logExistente || rule.trigger_type === 'palavra_chave') {
+                    canTrigger = true;
+                } else {
+                    // Se já disparou, permitimos repetir apenas se o último log for de MAIS de 24 HORAS (Sessão encerrada)
+                    const lastExecution = new Date(logExistente.created_at);
+                    const now = new Date();
+                    const diffHours = (now - lastExecution) / (1000 * 60 * 60);
+
+                    // Para TESTES do usuário, vamos reduzir para 5 minutos se for uma regra marcada (OPCIONAL) 
+                    // Mas por padrão seguimos a regra de 24h do ManyChat
+                    if (diffHours >= 24) {
+                        canTrigger = true;
+                        console.log(`[AUTOMAÇÃO] Reiniciando fluxo para ${lead.nome} - Sessão de 24h expirada.`);
+                    }
+                }
+
+                if (canTrigger) {
 
                     let mensagensParaEnviar = [];
 

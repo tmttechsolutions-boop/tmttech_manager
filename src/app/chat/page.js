@@ -140,6 +140,26 @@ export default function ChatPage() {
         }
     };
 
+    const handleResetAutomation = async () => {
+        if (!selectedLead || !empresaId) return;
+        if (!confirm(`Deseja resetar o histórico de automação para ${selectedLead.nome}? Isso permitirá que os fluxos iniciem novamente para este número.`)) return;
+
+        try {
+            const res = await fetch('/api/automacoes/reset-lead', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ leadId: selectedLead.id, empresaId })
+            });
+            if (res.ok) {
+                alert("Automação resetada! Agora você pode mandar uma nova mensagem para testar o fluxo.");
+            } else {
+                alert("Erro ao resetar automação.");
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const handleSyncHistory = async () => {
         if (!empresaId || syncing) return;
         setSyncing(true);
@@ -322,14 +342,34 @@ export default function ChatPage() {
                 {selectedLead ? (
                     <>
                         {/* Header do Chat */}
-                        <div style={{ padding: '16px 32px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--brand-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
-                                {selectedLead.nome.charAt(0)}
+                        <div style={{ padding: '16px 32px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'var(--brand-purple)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}>
+                                    {selectedLead.nome.charAt(0)}
+                                </div>
+                                <div>
+                                    <h3 style={{ fontSize: '1rem' }}>{selectedLead.nome}</h3>
+                                    <span style={{ fontSize: '0.75rem', color: 'var(--success)' }}>● Online</span>
+                                </div>
                             </div>
-                            <div>
-                                <h3 style={{ fontSize: '1rem' }}>{selectedLead.nome}</h3>
-                                <span style={{ fontSize: '0.75rem', color: 'var(--success)' }}>● Online</span>
-                            </div>
+
+                            <button
+                                onClick={handleResetAutomation}
+                                style={{
+                                    padding: '8px 16px',
+                                    borderRadius: '20px',
+                                    fontSize: '0.75rem',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid var(--border-subtle)',
+                                    color: 'var(--text-secondary)',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                                title="Resetar automação para este contato (permitir que os fluxos iniciem do zero)"
+                            >
+                                🔄 Resetar Robô
+                            </button>
                         </div>
 
                         {/* Lista de Mensagens */}
