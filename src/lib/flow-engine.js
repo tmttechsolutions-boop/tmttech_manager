@@ -88,11 +88,9 @@ export async function executeFlow({
                 menuText += `${idx + 1} - ${btn}\n`;
             });
 
-            console.log(`🤖 [FLOW ENGINE] Enviando Menu: ${targetNode.id}`);
-            await sendWhatsAppMessage(phone, menuText, empresaId);
-            messagesCount++;
-
-            // Registrar estado de menu ativo (Upsert garante apenas 1 por lead)
+            // Registrar estado de menu ativo ANTES de enviar a mensagem
+            // Isso previne a race condition extrema onde o usuário responde antes
+            // do Node.js terminar de gravar no banco devido a delays de compilação local
             await supabase.from('active_menus').upsert({
                 empresa_id: empresaId,
                 lead_id: lead.id,
@@ -101,8 +99,13 @@ export async function executeFlow({
                 created_at: new Date().toISOString()
             }, { onConflict: 'lead_id' });
 
+            console.log(`🤖 [FLOW ENGINE] Enviando Menu: ${targetNode.id}`);
+            await sendWhatsAppMessage(phone, menuText, empresaId);
+            messagesCount++;
+
             // PAUSAR O FLUXO (não propaga agora, apenas quando o cliente responder)
         }
+
     }
 
     return messagesCount;
