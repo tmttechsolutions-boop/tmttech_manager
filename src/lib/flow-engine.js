@@ -32,6 +32,15 @@ export async function executeFlow({
                 .replace(/{{telefone}}/gi, phone)
                 .replace(/{telefone}/gi, phone);
 
+            // Injeção de variáveis extras (ex: vindas do Webhook Externo via contextLead)
+            Object.keys(lead).forEach(key => {
+                if (key !== 'nome' && key !== 'telefone' && typeof lead[key] === 'string') {
+                    const regex1 = new RegExp(`{{${key}}}`, 'gi');
+                    const regex2 = new RegExp(`{${key}}`, 'gi');
+                    mensagemFinal = mensagemFinal.replace(regex1, lead[key]).replace(regex2, lead[key]);
+                }
+            });
+
             console.log(`🤖 [FLOW ENGINE] Enviando Mensagem: ${targetNode.id}`);
             await sendWhatsAppMessage(phone, mensagemFinal, empresaId);
             messagesCount++;

@@ -56,7 +56,10 @@ const DragAndDropSidebar = () => {
             <div className="dnd-category">
                 <div className="dnd-category-title">Passo Inicial</div>
                 <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'trigger', 'Gatilho')} draggable>
-                    <span className="icon" style={{ color: 'var(--success)' }}>⚡</span> Gatilho
+                    <span className="icon" style={{ color: 'var(--success)' }}>⚡</span> Gatilho (Mensagem)
+                </div>
+                <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'trigger', 'Webhook Externo')} draggable>
+                    <span className="icon" style={{ color: '#ec4899' }}>🔗</span> Webhook Externo
                 </div>
             </div>
 
@@ -294,15 +297,48 @@ const FlowArea = () => {
                         <div className="rule-form">
                             <div className="form-group mb-4">
                                 <label>Gatilho (Quando isso acontecer):</label>
-                                <select className="form-input">
-                                    <option>O usuário envia uma mensagem</option>
-                                    <option>Mencionou no Story</option>
+                                <select
+                                    className="form-input"
+                                    value={selectedNode.data.triggerType || 'mensagem_qualquer'}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { triggerType: e.target.value })}
+                                >
+                                    <option value="mensagem_qualquer">O usuário envia uma mensagem</option>
+                                    <option value="palavra_chave">Mensagem contém Palavra-Chave</option>
+                                    <option value="webhook">Webhook Externo (Site/App)</option>
                                 </select>
                             </div>
-                            <div className="form-group">
-                                <label>Palavra-chave Opcional:</label>
-                                <input type="text" className="form-input" placeholder="Ex: PREÇO" />
-                            </div>
+
+                            {selectedNode.data.triggerType === 'palavra_chave' && (
+                                <div className="form-group">
+                                    <label>Palavra-chave:</label>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Ex: COMPRAR"
+                                        value={selectedNode.data.keyword || ''}
+                                        onChange={(e) => updateNodeData(selectedNode.id, { keyword: e.target.value })}
+                                    />
+                                </div>
+                            )}
+
+                            {selectedNode.data.triggerType === 'webhook' && (
+                                <div className="form-group mt-4">
+                                    <div style={{ padding: '12px', backgroundColor: 'rgba(236, 72, 153, 0.1)', border: '1px solid #ec4899', borderRadius: '8px' }}>
+                                        <p style={{ fontSize: '0.8rem', color: '#ec4899', marginBottom: '8px' }}>
+                                            <strong>🔗 Link de Integração Webhook</strong><br />
+                                            Para disparar esta automação a partir de outro sistema (ex: site de agendamento), faça um POST HTTP para esta URL enviando <code>phone</code> e <code>name</code> no JSON.
+                                        </p>
+                                        <input
+                                            type="text"
+                                            readOnly
+                                            value={`https://tmttech-manager.vercel.app/api/webhook/custom/${ruleId}?empresaId=${empresaId}`}
+                                            className="form-input"
+                                            style={{ fontSize: '0.75rem', backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff' }}
+                                            onClick={(e) => { e.target.select(); navigator.clipboard.writeText(e.target.value); alert('URL copiada!'); }}
+                                        />
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
