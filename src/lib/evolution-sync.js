@@ -49,14 +49,16 @@ export async function syncChatHistory(empresaId, instanceName) {
 
             const phone = remoteJid.split('@')[0];
 
-            // 2.1 Garante que o Lead existe
-            let { data: lead } = await supabase
-                .from('leads')
-                .select('*')
-                .eq('telefone', phone)
-                .maybeSingle();
+            const pushNameRoot = chat.pushName || "";
+            const pushNameLast = chat.lastMessage?.pushName || "";
 
-            const realName = chat.name || chat.pushName || "";
+            // Tenta pegar o nome mais "real" possível. 
+            // Às vezes o pushName vem preenchido apenas com o número, então evitamos isso.
+            let realName = chat.name || "";
+            if (!realName || realName === phone) {
+                if (pushNameRoot && pushNameRoot !== phone) realName = pushNameRoot;
+                else if (pushNameLast && pushNameLast !== phone) realName = pushNameLast;
+            }
 
             if (!lead) {
                 const { data: newLead, error: leadErr } = await supabase

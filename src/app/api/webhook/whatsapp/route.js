@@ -52,7 +52,13 @@ export async function POST(req) {
         const isGroup = remoteJid.includes('@g.us');
 
         const phone = remoteJid.split('@')[0] || data.phone || '';
-        const pushName = data.pushName || data.data?.pushName || '';
+
+        // Extração de Nome mais Robusta (Evolution v2)
+        const pushNameRaw = data.pushName || data.data?.pushName || data.data?.message?.pushName || '';
+
+        // Se o pushName for igual ao número, consideramos que não temos o nome real ainda
+        const pushName = (pushNameRaw && pushNameRaw !== phone) ? pushNameRaw : '';
+
         const text = data.data?.message?.conversation || data.data?.message?.extendedTextMessage?.text || data.text || '';
         const isReplyStory = data.type === 'story_reply' || data.data?.message?.extendedTextMessage?.contextInfo?.isForwarded === false;
 
