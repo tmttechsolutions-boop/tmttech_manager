@@ -55,12 +55,22 @@ export async function POST(req) {
 
         // Se o lead não existe, cadastra ele automaticamente como novo!
         if (!lead) {
-            const { data: newLead } = await supabase
+            const { data: newLead, error: insertError } = await supabase
                 .from('leads')
                 .insert([{ nome: `Contato ${phone.slice(-4)}`, telefone: phone, status: 'novo', empresa_id: empresaId }])
                 .select()
                 .single();
+
+            if (insertError) {
+                console.error('[WHATSAPP WEBHOOK] Erro ao criar novo lead:', insertError);
+                return NextResponse.json({ message: 'Falha ao processar novo contato.' }, { status: 200 });
+            }
             lead = newLead;
+        }
+
+        if (!lead) {
+            console.error('[WHATSAPP WEBHOOK] Lead não encontrado e falha na criação.');
+            return NextResponse.json({ message: 'Lead não identificado.' }, { status: 200 });
         }
 
         // 3. PERSISTÊNCIA: Salva esta mensagem no histórico de CHAT (Visível na UI de Chat)
