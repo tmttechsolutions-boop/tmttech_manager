@@ -39,11 +39,12 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
 
         console.log(`[EVOLUTION] Dispatching to: ${instanceName} | Phone: ${cleanPhone}`);
 
+        // Tentamos com 'apikey' (padrão) e logamos se falhar por auth
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': EVOLUTION_API_KEY
+                'apikey': EVOLUTION_API_KEY.trim()
             },
             body: JSON.stringify({
                 number: cleanPhone,
@@ -53,12 +54,15 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
         });
 
         const result = await response.json().catch(() => ({}));
-        console.log(`[EVOLUTION] Result:`, result);
 
         if (!response.ok) {
-            // Se a Evolution devolver uma mensagem amigável, usamos ela
-            const errorMsg = result.message || result.error || (result.response?.message) || 'Erro na API Evolution';
-            return { success: false, error: errorMsg, status: response.status, result };
+            console.error(`[EVOLUTION ERROR] Status: ${response.status} | Body:`, result);
+            const errorMsg = result.message || result.error || 'Erro na API Evolution';
+            return {
+                success: false,
+                error: response.status === 401 ? 'Não Autorizado (Verifique a API Key no Vercel)' : errorMsg,
+                status: response.status
+            };
         }
 
         // Persist outbound message
