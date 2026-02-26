@@ -58,12 +58,14 @@ export async function POST(req) {
             const connectResponse = await fetch(`${EVOLUTION_API_URL}/instance/connect/${instanceName}`, {
                 method: 'GET',
                 headers: {
-                    'apikey': EVOLUTION_API_KEY
+                    'apikey': EVOLUTION_API_KEY.trim()
                 }
             });
 
             if (!connectResponse.ok) {
-                throw new Error("Falha ao se conectar à Evolution API.");
+                const errorData = await connectResponse.json().catch(() => ({}));
+                const msg = errorData.message || "Falha ao se conectar à Evolution API.";
+                throw new Error(connectResponse.status === 401 ? "Não Autorizado: Chave de API Inválida (Verifique no Vercel)" : msg);
             }
 
             const connectData = await connectResponse.json();
@@ -81,7 +83,7 @@ export async function POST(req) {
             const statusResponse = await fetch(`${EVOLUTION_API_URL}/instance/connectionState/${instanceName}`, {
                 method: 'GET',
                 headers: {
-                    'apikey': EVOLUTION_API_KEY
+                    'apikey': EVOLUTION_API_KEY.trim()
                 }
             });
 

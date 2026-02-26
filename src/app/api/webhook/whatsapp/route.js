@@ -133,15 +133,16 @@ export async function POST(req) {
                     // AQUI NÓS DISPARAMOS PARA A EVOLUTION API REAL!
                     console.log(`\n================================`);
                     console.log(`🤖 [DISPARO AUTOMÁTICO - REGRA: ${rule.trigger_type}]`);
-                    await sendWhatsAppMessage(lead.telefone, mensagemFinal, empresaId);
+                    const dispatch = await sendWhatsAppMessage(lead.telefone, mensagemFinal, empresaId);
                     console.log(`================================\n`);
 
-                    // Registra log isolado por conta no webhook de resposta
+                    // Registra log com o status real do envio
                     await supabase.from('message_logs').insert([{
                         rule_id: rule.id,
                         lead_id: lead.id,
                         empresa_id: lead.empresa_id,
-                        status: 'enviado'
+                        status: dispatch.success ? 'enviado' : 'erro',
+                        error_message: dispatch.success ? null : dispatch.error
                     }]);
 
                     mensagensDisparadas++;
