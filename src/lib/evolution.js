@@ -154,11 +154,10 @@ export async function sendWhatsAppInteractiveMenu(phone, text, buttonsArray, emp
                 delay: 1200,
                 presence: "composing"
             },
-            buttonMessage: {
-                text: text,
-                footerText: "Selecione uma opção",
-                buttons: formattedButtons
-            }
+            title: text, // Evolution v2 uses these top-level properties often
+            description: "Selecione uma das opções abaixo:",
+            footerText: "Clique em uma opção",
+            buttons: formattedButtons
         };
 
         const response = await fetch(endpoint, {
