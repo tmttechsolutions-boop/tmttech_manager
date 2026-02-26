@@ -19,6 +19,7 @@ export async function GET() {
             const tests = [
                 { name: 'Header: apikey', fetch: () => fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, { headers: { 'apikey': EVOLUTION_API_KEY.trim() } }) },
                 { name: 'Header: x-api-key', fetch: () => fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, { headers: { 'x-api-key': EVOLUTION_API_KEY.trim() } }) },
+                { name: 'Header: Authorization (Bearer)', fetch: () => fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, { headers: { 'Authorization': `Bearer ${EVOLUTION_API_KEY.trim()}` } }) },
                 { name: 'Query Param: ?apikey=...', fetch: () => fetch(`${EVOLUTION_API_URL}/instance/fetchInstances?apikey=${EVOLUTION_API_KEY.trim()}`) },
                 { name: 'Header: apiKey (CamelCase)', fetch: () => fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, { headers: { 'apiKey': EVOLUTION_API_KEY.trim() } }) }
             ];
@@ -44,7 +45,7 @@ export async function GET() {
         })) || [];
 
         return NextResponse.json({
-            debug_v: '1.7-mega-auth-test',
+            debug_v: '1.8-exhaustive-auth-test',
             env_vars: {
                 EVOLUTION_API_URL,
                 key_length: EVOLUTION_API_KEY?.trim().length,
