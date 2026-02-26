@@ -1,22 +1,14 @@
-const dotenv = require('dotenv');
-dotenv.config({ path: '.env.local' });
-
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
-const INSTANCE_NAME = process.env.EVOLUTION_INSTANCE_NAME || 'tmttech_manager';
+require('dotenv').config({ path: '.env.local' });
 
 async function checkWebhook() {
-    console.log(`Checking Webhook for instance: ${INSTANCE_NAME}`);
+    const url = process.env.EVOLUTION_API_URL + '/webhook/find/tmttech_manager';
     try {
-        const response = await fetch(`${EVOLUTION_API_URL}/webhook/find/${INSTANCE_NAME}`, {
-            headers: {
-                'apikey': EVOLUTION_API_KEY.trim()
-            }
-        });
-        const data = await response.json();
-        console.log('Webhook Config:', JSON.stringify(data, null, 2));
-    } catch (error) {
-        console.error('Error fetching webhook:', error);
+        const res = await fetch(url, { headers: { apikey: process.env.EVOLUTION_API_KEY } });
+        const data = await res.json();
+        console.log("Webhook configuration for tmttech_manager:");
+        console.log(JSON.stringify(data, null, 2));
+    } catch (err) {
+        console.error("Error fetching webhook:", err);
     }
 }
 
