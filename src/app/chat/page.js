@@ -159,29 +159,75 @@ export default function ChatPage() {
             {/* Sidebar de Contatos */}
             <div className="chat-contacts-sidebar" style={{ width: '350px', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.2)' }}>
                 <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <h2 style={{ fontSize: '1.2rem' }}>Conversas</h2>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h2 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0 }}>Conversas</h2>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                    onClick={handleSyncHistory}
+                                    disabled={syncing}
+                                    style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '6px',
+                                        background: 'rgba(192, 132, 252, 0.1)',
+                                        border: '1px solid rgba(192, 132, 252, 0.2)',
+                                        color: syncing ? 'var(--text-muted)' : 'var(--brand-purple)',
+                                        cursor: syncing ? 'default' : 'pointer',
+                                        fontSize: '0.75rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                    title="Importar do WhatsApp"
+                                >
+                                    {syncing ? '⌛' : '📥'} {syncing ? 'Sinc' : 'Sinc'}
+                                </button>
+                                <button
+                                    onClick={fetchActiveChats}
+                                    style={{
+                                        padding: '6px 10px',
+                                        borderRadius: '6px',
+                                        background: 'rgba(255,255,255,0.05)',
+                                        border: '1px solid rgba(255,255,255,0.1)',
+                                        color: 'white',
+                                        cursor: 'pointer',
+                                        fontSize: '0.75rem',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '6px'
+                                    }}
+                                    title="Atualizar lista"
+                                >
+                                    🔄
+                                </button>
+                            </div>
+                        </div>
+
                         <div style={{ display: 'flex', gap: '8px' }}>
+                            <input
+                                type="text"
+                                placeholder="Buscar contato..."
+                                className="form-input"
+                                style={{ flex: 1, fontSize: '0.85rem', padding: '10px 16px' }}
+                            />
                             <button
-                                onClick={handleSyncHistory}
-                                disabled={syncing}
-                                style={{ background: 'none', border: 'none', color: syncing ? 'var(--text-muted)' : 'var(--brand-purple)', cursor: syncing ? 'default' : 'pointer', fontSize: '0.8rem' }}
-                                title="Importar conversas antigas"
+                                style={{
+                                    padding: '0 14px',
+                                    borderRadius: '8px',
+                                    background: 'var(--brand-purple)',
+                                    border: 'none',
+                                    color: 'white',
+                                    cursor: 'pointer',
+                                    fontSize: '1.4rem',
+                                    fontWeight: 'bold'
+                                }}
+                                title="Novo Contato"
+                                onClick={() => alert('Função de novo contato em breve')}
                             >
-                                {syncing ? '⌛ Sincronizando...' : '📥 Sincronizar'}
-                            </button>
-                            <button
-                                onClick={fetchActiveChats}
-                                style={{ background: 'none', border: 'none', color: 'var(--brand-purple)', cursor: 'pointer', fontSize: '0.8rem' }}
-                                title="Atualizar lista"
-                            >
-                                🔄 Atualizar
+                                +
                             </button>
                         </div>
-                        village
-                        village
                     </div>
-                    <input type="text" placeholder="Buscar contato..." className="form-input mt-4" style={{ fontSize: '0.85rem' }} />
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto' }}>
