@@ -19,16 +19,16 @@ export async function syncChatHistory(empresaId, instanceName) {
     };
 
     try {
-        console.log(`[SYNC] Iniciando sincronização para ${instanceName}...`);
+        console.log(`[SYNC] Iniciando sincronização DEEP para ${instanceName}...`);
 
-        // 1. Busca lista de Chats do Evolution
+        // 1. Busca lista de Chats do Evolution (Aumentamos para 100 para pegar mais gente)
         const chatsRes = await fetch(`${EVOLUTION_API_URL}/chat/findChats/${instanceName}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
                 'apikey': EVOLUTION_API_KEY.trim()
             },
-            body: JSON.stringify({ count: 50 }) // Pega os últimos 50 chats ativos
+            body: JSON.stringify({ count: 100 })
         });
 
         if (!chatsRes.ok) {
@@ -42,28 +42,34 @@ export async function syncChatHistory(empresaId, instanceName) {
             return results;
         }
 
+        console.log(`[SYNC] Processando ${chats.length} conversas encontradas...`);
+
         // 2. Processa cada Chat
         for (const chat of chats) {
             const remoteJid = chat.id || chat.remoteJid;
             if (!remoteJid || remoteJid.includes('@g.us')) continue; // Pula grupos
 
             const phone = remoteJid.split('@')[0];
-
             const pushNameRoot = chat.pushName || "";
             const pushNameLast = chat.lastMessage?.pushName || "";
 
             // Tenta pegar o nome mais "real" possível. 
-            // Às vezes o pushName vem preenchido apenas com o número, então evitamos isso.
             let realName = chat.name || "";
             if (!realName || realName === phone) {
                 if (pushNameRoot && pushNameRoot !== phone) realName = pushNameRoot;
                 else if (pushNameLast && pushNameLast !== phone) realName = pushNameLast;
             }
 
-            // [NOVO] SE AINDA NÃO TEMOS UM NOME REAL, TENTA O FETCHPROFILE (ALTA FIDELIDADE)
-            if (!realName || realName === phone) {
+            // BUSCA O LEAD NO BANCO
+            let { data: lead } = await supabase
+                .from('leads')
+                .select('*')
+                .eq('telefone', phone)
+                .maybeSingle();
+
+            // CASO ESPECIAL: SE SE O NOME AINDA FOR GENÉRICO, TENTA O FETCHPROFILE (FORÇADO)
+            if (!realName || realName === phone || (lead && lead.nome.startsWith('Contato '))) {
                 try {
-                    console.log(`[SYNC] Nome não encontrado para ${phone}. Tentando fetchProfile...`);
                     const profileRes = await fetch(`${EVOLUTION_API_URL}/chat/fetchProfile/${instanceName}`, {
                         method: 'POST',
                         headers: {
@@ -76,21 +82,14 @@ export async function syncChatHistory(empresaId, instanceName) {
                         const profileData = await profileRes.json();
                         if (profileData.name && profileData.name !== phone) {
                             realName = profileData.name;
-                            console.log(`[SYNC] Nome descoberto via fetchProfile para ${phone}: ${realName}`);
                         }
                     }
                 } catch (err) {
-                    console.error(`[SYNC] Falha ao buscar profile para ${phone}:`, err.message);
+                    console.error(`[SYNC] Erro no fetchProfile para ${phone}:`, err.message);
                 }
             }
 
-            // 2.1 Garante que o Lead existe no banco
-            let { data: lead } = await supabase
-                .from('leads')
-                .select('*')
-                .eq('telefone', phone)
-                .maybeSingle();
-
+            // GARANTE O LEAD
             if (!lead) {
                 const { data: newLead, error: leadErr } = await supabase
                     .from('leads')
@@ -109,8 +108,8 @@ export async function syncChatHistory(empresaId, instanceName) {
                 }
                 lead = newLead;
                 results.leadsCreated++;
-            } else if (realName && (lead.nome.startsWith('Contato ') || !lead.nome || lead.nome === phone)) {
-                // Se o lead já existe mas o nome é genérico ou número, atualiza para o nome real descoberto
+            } else if (realName && (lead.nome.startsWith('Contato ') || lead.nome === phone || !lead.nome)) {
+                // Atualização Retroativa de Nome!
                 const { data: updatedLead } = await supabase
                     .from('leads')
                     .update({ nome: realName })
@@ -119,11 +118,11 @@ export async function syncChatHistory(empresaId, instanceName) {
                     .single();
                 if (updatedLead) {
                     lead = updatedLead;
-                    console.log(`[SYNC] Nome do Lead ${phone} corrigido para: ${realName}`);
+                    console.log(`[SYNC] Nome corrigido de ${phone} para: ${realName}`);
                 }
             }
 
-            // 2.2 Busca mensagens desse Chat no Evolution
+            // 3. SINC DE MENSAGENS (Processamos se tivermos o lead)
             const msgsRes = await fetch(`${EVOLUTION_API_URL}/chat/findMessages/${instanceName}`, {
                 method: 'POST',
                 headers: {
@@ -132,48 +131,47 @@ export async function syncChatHistory(empresaId, instanceName) {
                 },
                 body: JSON.stringify({
                     where: { remoteJid: remoteJid },
-                    count: 30 // Últimas 30 mensagens por chat
+                    count: 20 // Pegamos as últimas 20 mensagens
                 })
             });
 
-            if (!msgsRes.ok) continue;
+            if (msgsRes.ok) {
+                const messages = await msgsRes.json();
+                const messageList = Array.isArray(messages) ? messages : (messages.record || []);
 
-            const messages = await msgsRes.json();
-            const messageList = Array.isArray(messages) ? messages : (messages.record || []);
+                for (const msg of messageList) {
+                    const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.content || "";
+                    if (!text) continue;
 
-            // 2.3 Insere mensagens no Supabase (Deduplicando pelo timestamp se possível ou conteúdo)
-            for (const msg of messageList) {
-                const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.content || "";
-                if (!text) continue;
+                    const createdAt = new Date(msg.messageTimestamp * 1000).toISOString();
+                    const direction = msg.key?.fromMe ? 'outbound' : 'inbound';
 
-                const createdAt = new Date(msg.messageTimestamp * 1000).toISOString();
-                const direction = msg.key?.fromMe ? 'outbound' : 'inbound';
-
-                // Verifica se já existe (busca por lead, conteúdo e data aproximada)
-                const { data: exists } = await supabase
-                    .from('chat_messages')
-                    .select('id')
-                    .eq('lead_id', lead.id)
-                    .eq('content', text)
-                    .limit(1);
-
-                if (!exists || exists.length === 0) {
-                    const { error: msgErr } = await supabase
+                    // Deduplicação básica
+                    const { data: exists } = await supabase
                         .from('chat_messages')
-                        .insert([{
-                            empresa_id: empresaId,
-                            lead_id: lead.id,
-                            direction: direction,
-                            content: text,
-                            message_type: 'text',
-                            created_at: createdAt
-                        }]);
+                        .select('id')
+                        .eq('lead_id', lead.id)
+                        .eq('content', text)
+                        .eq('direction', direction)
+                        .limit(1);
 
-                    if (!msgErr) results.messagesSynced++;
+                    if (!exists || exists.length === 0) {
+                        const { error: msgErr } = await supabase
+                            .from('chat_messages')
+                            .insert([{
+                                empresa_id: empresaId,
+                                lead_id: lead.id,
+                                direction: direction,
+                                content: text,
+                                message_type: 'text',
+                                created_at: createdAt
+                            }]);
+
+                        if (!msgErr) results.messagesSynced++;
+                    }
                 }
             }
         }
-
         return results;
 
     } catch (error) {
