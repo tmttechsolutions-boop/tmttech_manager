@@ -74,7 +74,7 @@ export async function executeFlow({
 
             const phone = lead.telefone;
 
-            // Construir a mensagem inicial
+            // Construir a mensagem com numeração (Fallback para Botões Nativos Rotos)
             let menuText = targetNode.data.message || 'Selecione uma das opções:';
             menuText = menuText
                 .replace(/{{nome}}/gi, lead.nome || 'cliente')
@@ -82,6 +82,11 @@ export async function executeFlow({
                 .replace(/{Nome do contato}/gi, lead.nome || 'cliente')
                 .replace(/{{telefone}}/gi, phone)
                 .replace(/{telefone}/gi, phone);
+
+            menuText += '\n\n';
+            buttons.forEach((btn, idx) => {
+                menuText += `${idx + 1} - ${btn}\n`;
+            });
 
             // Registrar estado de menu ativo ANTES de enviar a mensagem
             // Isso previne a race condition extrema onde o usuário responde antes
@@ -94,8 +99,8 @@ export async function executeFlow({
                 created_at: new Date().toISOString()
             }, { onConflict: 'lead_id' });
 
-            console.log(`🤖 [FLOW ENGINE] Enviando Menu Interativo (Botões): ${targetNode.id}`);
-            await sendWhatsAppInteractiveMenu(phone, menuText, buttons, empresaId);
+            console.log(`🤖 [FLOW ENGINE] Enviando Menu (Texto Clássico): ${targetNode.id}`);
+            await sendWhatsAppMessage(phone, menuText, empresaId);
             messagesCount++;
 
             // PAUSAR O FLUXO (não propaga agora, apenas quando o cliente responder)
