@@ -8,13 +8,14 @@ export default function ChatPage() {
     const supabase = createBrowserSupabaseClient();
 
     const [leads, setLeads] = useState([]);
+    const [activeTab, setActiveTab] = useState('conversas'); // 'conversas' ou 'contatos'
     const [selectedLead, setSelectedLead] = useState(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState("");
     const [loadingLeads, setLoadingLeads] = useState(true);
     const [sending, setSending] = useState(false);
     const [syncing, setSyncing] = useState(false);
-
+    const [searchQuery, setSearchQuery] = useState("");
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -151,115 +152,159 @@ export default function ChatPage() {
         }
     };
 
-    if (loadingEmpresa) return <div className="p-8">Carregando Empresa...</div>;
+    const filteredLeads = leads.filter(lead => {
+        const matchesSearch =
+            lead.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            lead.telefone.includes(searchQuery);
+
+        if (!matchesSearch) return false;
+
+        if (activeTab === 'conversas') {
+            // Só mostra quem tem mensagens
+            return lead.chat_messages && lead.chat_messages.length > 0;
+        }
+        return true; // Aba de contatos mostra todos
+    });
+
+    if (loadingEmpresa) return <div className="p-8 text-center">Carregando Empresa...</div>;
 
     return (
-        <div className="chat-layout glass-panel" style={{ display: 'flex', height: 'calc(100vh - 120px)', margin: '-20px', overflow: 'hidden', borderRadius: '12px' }}>
+        <div className="chat-layout glass-panel" style={{ display: 'flex', height: 'calc(100vh - 120px)', margin: '-20px', overflow: 'hidden', borderRadius: '12px', border: '1px solid var(--border-subtle)' }}>
 
             {/* Sidebar de Contatos */}
-            <div className="chat-contacts-sidebar" style={{ width: '350px', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.2)' }}>
-                <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h2 style={{ fontSize: '1.2rem', fontWeight: '700', margin: 0 }}>Conversas</h2>
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                                <button
-                                    onClick={handleSyncHistory}
-                                    disabled={syncing}
-                                    style={{
-                                        padding: '6px 10px',
-                                        borderRadius: '6px',
-                                        background: 'rgba(192, 132, 252, 0.1)',
-                                        border: '1px solid rgba(192, 132, 252, 0.2)',
-                                        color: syncing ? 'var(--text-muted)' : 'var(--brand-purple)',
-                                        cursor: syncing ? 'default' : 'pointer',
-                                        fontSize: '0.75rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                    }}
-                                    title="Importar do WhatsApp"
-                                >
-                                    {syncing ? '⌛' : '📥'} {syncing ? 'Sinc' : 'Sinc'}
-                                </button>
-                                <button
-                                    onClick={fetchActiveChats}
-                                    style={{
-                                        padding: '6px 10px',
-                                        borderRadius: '6px',
-                                        background: 'rgba(255,255,255,0.05)',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        color: 'white',
-                                        cursor: 'pointer',
-                                        fontSize: '0.75rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '6px'
-                                    }}
-                                    title="Atualizar lista"
-                                >
-                                    🔄
-                                </button>
-                            </div>
-                        </div>
+            <div className="chat-contacts-sidebar" style={{ width: '380px', borderRight: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.2)' }}>
 
+                {/* Header com Abas */}
+                <div style={{ padding: '24px 24px 12px 24px', background: 'rgba(255,255,255,0.02)' }}>
+                    <div style={{ display: 'flex', gap: '20px', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                        <button
+                            onClick={() => setActiveTab('conversas')}
+                            style={{
+                                padding: '8px 0',
+                                background: 'none',
+                                border: 'none',
+                                color: activeTab === 'conversas' ? 'var(--brand-purple)' : 'var(--text-muted)',
+                                borderBottom: activeTab === 'conversas' ? '2px solid var(--brand-purple)' : '2px solid transparent',
+                                fontWeight: '600',
+                                fontSize: '0.95rem',
+                                cursor: 'pointer',
+                                transition: '0.2s'
+                            }}
+                        >
+                            💬 Conversas
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('contatos')}
+                            style={{
+                                padding: '8px 0',
+                                background: 'none',
+                                border: 'none',
+                                color: activeTab === 'contatos' ? 'var(--brand-purple)' : 'var(--text-muted)',
+                                borderBottom: activeTab === 'contatos' ? '2px solid var(--brand-purple)' : '2px solid transparent',
+                                fontWeight: '600',
+                                fontSize: '0.95rem',
+                                cursor: 'pointer',
+                                transition: '0.2s'
+                            }}
+                        >
+                            👥 Meus Contatos
+                        </button>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <input
-                                type="text"
-                                placeholder="Buscar contato..."
-                                className="form-input"
-                                style={{ flex: 1, fontSize: '0.85rem', padding: '10px 16px' }}
-                            />
                             <button
+                                onClick={handleSyncHistory}
+                                disabled={syncing}
                                 style={{
-                                    padding: '0 14px',
-                                    borderRadius: '8px',
-                                    background: 'var(--brand-purple)',
-                                    border: 'none',
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    background: 'rgba(192, 132, 252, 0.1)',
+                                    border: '1px solid rgba(192, 132, 252, 0.2)',
+                                    color: syncing ? 'var(--text-muted)' : 'var(--brand-purple)',
+                                    cursor: syncing ? 'default' : 'pointer',
+                                    fontSize: '0.7rem'
+                                }}
+                            >
+                                {syncing ? '⌛ Sincronizando' : '📥 Importar'}
+                            </button>
+                            <button
+                                onClick={fetchActiveChats}
+                                style={{
+                                    padding: '6px 10px',
+                                    borderRadius: '6px',
+                                    background: 'rgba(255,255,255,0.05)',
+                                    border: '1px solid rgba(255,255,255,0.1)',
                                     color: 'white',
                                     cursor: 'pointer',
-                                    fontSize: '1.4rem',
-                                    fontWeight: 'bold'
+                                    fontSize: '0.7rem'
                                 }}
-                                title="Novo Contato"
-                                onClick={() => alert('Função de novo contato em breve')}
                             >
-                                +
+                                🔄
                             </button>
                         </div>
                     </div>
+
+                    <input
+                        type="text"
+                        placeholder="Buscar por nome ou número..."
+                        className="form-input"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        style={{ width: '100%', fontSize: '0.85rem', padding: '10px 16px', background: 'rgba(255,255,255,0.03)' }}
+                    />
                 </div>
 
+                {/* Lista de Leads Filtrada */}
                 <div style={{ flex: 1, overflowY: 'auto' }}>
                     {loadingLeads ? (
-                        <p style={{ padding: '20px', color: 'var(--text-muted)' }}>Buscando contatos...</p>
-                    ) : leads.map(lead => (
+                        <p style={{ padding: '24px', color: 'var(--text-muted)', textAlign: 'center' }}>Buscando contatos...</p>
+                    ) : filteredLeads.length === 0 ? (
+                        <div style={{ padding: '40px 24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                            <span style={{ fontSize: '2rem', display: 'block', marginBottom: '12px' }}>📭</span>
+                            <p style={{ fontSize: '0.9rem' }}>Nenhum lead encontrado nesta aba.</p>
+                        </div>
+                    ) : filteredLeads.map(lead => (
                         <div
                             key={lead.id}
                             onClick={() => setSelectedLead(lead)}
                             style={{
                                 padding: '16px 24px',
                                 cursor: 'pointer',
-                                borderBottom: '1px solid rgba(255,255,255,0.05)',
-                                background: selectedLead?.id === lead.id ? 'rgba(192, 132, 252, 0.1)' : 'transparent',
-                                transition: '0.2s'
+                                borderBottom: '1px solid rgba(255,255,255,0.03)',
+                                background: selectedLead?.id === lead.id ? 'rgba(192, 132, 252, 0.08)' : 'transparent',
+                                borderLeft: selectedLead?.id === lead.id ? '4px solid var(--brand-purple)' : '4px solid transparent',
+                                transition: '0.2s',
+                                position: 'relative'
                             }}
                             className="chat-contact-item"
                         >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <h4 style={{ fontSize: '1rem', fontWeight: '600' }}>{lead.nome}</h4>
-                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                <h4 style={{ fontSize: '0.95rem', fontWeight: '600', color: selectedLead?.id === lead.id ? 'white' : 'var(--text-main)', margin: 0 }}>
+                                    {lead.nome}
+                                </h4>
+                                <span style={{
+                                    fontSize: '0.65rem',
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    background: lead.status === 'novo' ? 'rgba(192, 132, 252, 0.2)' : 'rgba(255,255,255,0.05)',
+                                    color: lead.status === 'novo' ? 'var(--brand-purple)' : 'var(--text-muted)'
+                                }}>
                                     {lead.status.toUpperCase()}
                                 </span>
                             </div>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {lead.telefone}
-                            </p>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                                    {lead.telefone}
+                                </p>
+                                {lead.chat_messages?.length > 0 && (
+                                    <span style={{ fontSize: '0.7rem', color: 'var(--brand-purple)' }}>●</span>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
             </div>
-
             {/* Área de Mensagens */}
             <div className="chat-main-area" style={{ flex: 1, display: 'flex', flexDirection: 'column', background: 'rgba(255,255,255,0.01)' }}>
                 {selectedLead ? (
