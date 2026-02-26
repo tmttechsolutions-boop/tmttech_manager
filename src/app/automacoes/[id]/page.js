@@ -397,18 +397,30 @@ const FlowArea = () => {
 
                     {selectedNode.type === 'delay' && (
                         <div className="rule-form">
-                            <div className="form-group">
-                                <label>Atraso Inteligente (Tempo):</label>
+                            <div className="form-group mb-4">
+                                <label>Valor do Atraso:</label>
                                 <input
-                                    type="text"
+                                    type="number"
                                     className="form-input"
-                                    value={selectedNode.data.delay || 'Aguardar 1 dia'}
-                                    onChange={(e) => updateNodeData(selectedNode.id, { delay: e.target.value })}
+                                    value={selectedNode.data.delayValue || '1'}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { delayValue: e.target.value })}
                                 />
+                            </div>
+                            <div className="form-group">
+                                <label>Unidade de Tempo:</label>
+                                <select
+                                    className="form-input"
+                                    value={selectedNode.data.delayUnit || 'Minutos'}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { delayUnit: e.target.value })}
+                                >
+                                    <option value="Segundos">Segundos</option>
+                                    <option value="Minutos">Minutos</option>
+                                    <option value="Horas">Horas</option>
+                                    <option value="Dias">Dias</option>
+                                </select>
                             </div>
                         </div>
                     )}
-
                     {selectedNode.type === 'condition' && (
                         <div className="rule-form">
                             <div className="form-group mb-4">

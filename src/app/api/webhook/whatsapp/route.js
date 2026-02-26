@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/supabase';
-import { sendWhatsAppMessage } from '@/lib/evolution'; // Importando a API Real
+import { sendWhatsAppMessage } from '@/lib/evolution';
+import { executeFlow } from '@/lib/flow-engine';
+// Importando a API Real
 
 // Esta rota será chamada pela Evolution API ou pela API Oficial do WhatsApp
 // Sempre que uma nova mensagem de um cliente chegar no seu número
@@ -201,33 +203,28 @@ export async function POST(req) {
 
                     let mensagensParaEnviar = [];
 
-                    // RESOLUÇÃO DO CONTEÚDO: Fluxo Visual ou Template Simples
+                    // RESOLUÇÃO DO CONTEÚDO: Fluxo Visual
                     if (rule.flow_data && rule.flow_data.nodes) {
-                        // MOTOR DE FLUXO VISUAL (React Flow)
-                        const nodes = rule.flow_data.nodes;
-                        const edges = rule.flow_data.edges || [];
+                        const { nodes, edges } = rule.flow_data;
 
-                        // Busca o nó de gatilho
+                        // Busca o nó de gatilho e inicia
                         const triggerNode = nodes.find(n => n.type === 'trigger');
                         if (triggerNode) {
-                            // Encontra conexões de saída do gatilho
-                            const connectedEdges = edges.filter(e => e.source === triggerNode.id);
-                            for (const edge of connectedEdges) {
-                                const targetNode = nodes.find(n => n.id === edge.target);
-                                // Se for um nó de ação com mensagem, extrai o texto
-                                if (targetNode && targetNode.type === 'action' && targetNode.data?.message) {
-                                    mensagensParaEnviar.push(targetNode.data.message);
-                                }
-                            }
+                            console.log(`🚀 [WEBHOOK] Iniciando Fluxo Visual: ${rule.name}`);
+                            const count = await executeFlow({
+                                nodes,
+                                edges,
+                                currentNodeId: triggerNode.id,
+                                lead,
+                                empresaId,
+                                ruleId: rule.id,
+                                supabase
+                            });
+                            mensagensDisparadas += count;
                         }
                     } else if (rule.message_template) {
-                        // TEMPLATE LEGADO (Texto Simples)
-                        mensagensParaEnviar.push(rule.message_template);
-                    }
-
-                    // DISPAROS
-                    for (const rawMsg of mensagensParaEnviar) {
-                        // SUBSTITUIÇÃO DE VARIÁVEIS ROBUSTA (Case Insensitive)
+                        // TEMPLATE LEGADO (Texto Simples) - Mantemos por retrocompatibilidade
+                        let rawMsg = rule.message_template;
                         let mensagemFinal = rawMsg
                             .replace(/{{nome}}/gi, lead.nome || 'cliente')
                             .replace(/{nome}/gi, lead.nome || 'cliente')
@@ -235,27 +232,23 @@ export async function POST(req) {
                             .replace(/{{telefone}}/gi, phone)
                             .replace(/{telefone}/gi, phone);
 
-                        console.log(`🤖 [AUTOMAÇÃO] Disparando para ${phone} via Regra: "${rule.name || rule.trigger_type}"`);
-                        const dispatch = await sendWhatsAppMessage(phone, mensagemFinal, empresaId);
+                        await sendWhatsAppMessage(phone, mensagemFinal, empresaId);
+                        mensagensDisparadas++;
+                    }
 
-                        // Registra log
+                    // Se disparou algo (mesmo que seja agendado), registramos o log da REGRA
+                    if (mensagensDisparadas > 0 || true) { // Sempre registra se executou o fluxo
                         await supabase.from('message_logs').insert([{
                             rule_id: rule.id,
                             lead_id: lead.id,
                             empresa_id: empresaId,
-                            status: dispatch.success ? 'enviado' : 'erro',
-                            error_message: dispatch.success ? null : (dispatch.error || 'Erro desconhecido')
+                            status: 'enviado' // Consideramos enviado se o fluxo partiu
                         }]);
-
-                        mensagensDisparadas++;
+                        break;
                     }
-
-                    // Se disparou algo, interrompemos para este webhook (evita disparar múltiplas regras pra mesma msg)
-                    if (mensagensDisparadas > 0) break;
                 }
             }
         }
-
         return NextResponse.json({
             message: 'Mensagem processada pelo motor de automação.',
             tamanho_fila_envio: mensagensDisparadas

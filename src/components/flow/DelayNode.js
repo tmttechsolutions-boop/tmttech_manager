@@ -9,7 +9,9 @@ export default function DelayNode({ data, selected }) {
                 <strong>Atraso Inteligente</strong>
             </div>
             <div className="node-body">
-                <p className="node-label text-center">{data.delay || 'Aguardar 1 dia'}</p>
+                <p className="node-label text-center" style={{ fontWeight: '600' }}>
+                    {data.delayValue ? `Aguardar ${data.delayValue} ${data.delayUnit || 'Minutos'}` : 'Atraso não configurado'}
+                </p>
             </div>
             <Handle type="source" position={Position.Right} id="source" className="node-handle source-handle" />
         </div>

@@ -1,0 +1,74 @@
+import { createSupabaseClient } from './supabase';
+import { sendWhatsAppMessage } from './evolution';
+
+/**
+ * Motor de execução de fluxos visuais (React Flow)
+ */
+export async function executeFlow({
+    nodes,
+    edges,
+    currentNodeId,
+    lead,
+    empresaId,
+    ruleId,
+    supabase = null
+}) {
+    if (!supabase) supabase = createSupabaseClient(true);
+
+    const connections = edges.filter(e => e.source === currentNodeId);
+    let messagesCount = 0;
+
+    for (const edge of connections) {
+        const targetNode = nodes.find(n => n.id === edge.target);
+        if (!targetNode) continue;
+
+        if (targetNode.type === 'action' && targetNode.data?.message) {
+            // SUBSTITUIÇÃO DE VARIÁVEIS ROBUSTA
+            const phone = lead.telefone;
+            let mensagemFinal = targetNode.data.message
+                .replace(/{{nome}}/gi, lead.nome || 'cliente')
+                .replace(/{nome}/gi, lead.nome || 'cliente')
+                .replace(/{Nome do contato}/gi, lead.nome || 'cliente')
+                .replace(/{{telefone}}/gi, phone)
+                .replace(/{telefone}/gi, phone);
+
+            console.log(`🤖 [FLOW ENGINE] Enviando Mensagem: ${targetNode.id}`);
+            await sendWhatsAppMessage(phone, mensagemFinal, empresaId);
+            messagesCount++;
+
+            // Continua o fluxo (Recursivo)
+            const subCount = await executeFlow({ nodes, edges, currentNodeId: targetNode.id, lead, empresaId, ruleId, supabase });
+            messagesCount += subCount;
+
+        } else if (targetNode.type === 'delay') {
+            // Lógica de ATRASO (DELAY)
+            const value = parseInt(targetNode.data.delayValue) || 1;
+            const unit = targetNode.data.delayUnit || 'Minutos';
+
+            let scheduledFor = new Date();
+            if (unit === 'Segundos') scheduledFor.setSeconds(scheduledFor.getSeconds() + value);
+            else if (unit === 'Minutos') scheduledFor.setMinutes(scheduledFor.getMinutes() + value);
+            else if (unit === 'Horas') scheduledFor.setHours(scheduledFor.getHours() + value);
+            else if (unit === 'Dias') scheduledFor.setDate(scheduledFor.getDate() + value);
+
+            console.log(`⏱️ [FLOW ENGINE] Agendando Delay: ${value} ${unit} para ${scheduledFor.toISOString()}`);
+
+            // Busca a regra_id se não estiver disponível (precisamos dela para o poller)
+            // Aqui assumimos que quem chama sabe o context - mas podemos tentar encontrar
+            // Por simplicidade, assumimos que o poller vai precisar disso.
+
+            await supabase.from('delayed_messages').insert([{
+                empresa_id: empresaId,
+                lead_id: lead.id,
+                rule_id: ruleId,
+                node_id: targetNode.id,
+                scheduled_for: scheduledFor.toISOString(),
+                status: 'pending'
+            }]);
+
+            // Pausa este ramo
+        }
+    }
+
+    return messagesCount;
+}
