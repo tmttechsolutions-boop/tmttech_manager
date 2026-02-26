@@ -158,23 +158,7 @@ export async function POST(req) {
                 const menuNode = nodes.find(n => n.id === activeMenu.node_id);
                 if (menuNode) {
                     const buttons = menuNode.data.buttons || [];
-
-                    // Suporte a cliques nativos em botões: se a payload da API enviar o título clicado num objeto aninhado
-                    // O Evolution API às vezes envia isso como um tipo específico de mensagem, mas por segurança olhamos os campos comuns.
-                    let replyText = text.trim().toLowerCase();
-                    const messageType = messageData.messageType;
-                    if (messageType === 'buttonsResponseMessage' || messageType === 'templateButtonReplyMessage' || messageType === 'interactiveResponseMessage') {
-                        // Se for uma resposta interativa estruturada, tenta buscar o contexto (depende da doc da Evolution API escolhida pelo user)
-                        // A nossa heurística usa o "text" que extraímos na raiz do webhook, que a Evolution costuma populacionar com o "title" do botão!
-                        // Se text estiver vazio, tenta procurar nas propriedades aninhadas comuns:
-                        if (!text && messageData.message?.buttonsResponseMessage?.selectedDisplayText) {
-                            replyText = messageData.message.buttonsResponseMessage.selectedDisplayText.trim().toLowerCase();
-                        } else if (!text && messageData.message?.interactiveResponseMessage?.nativeFlowResponseMessage?.name) {
-                            // Algumas versões mais novas enviam o nome do botão aqui
-                            replyText = messageData.message.interactiveResponseMessage.nativeFlowResponseMessage.name.trim().toLowerCase();
-                        }
-                    }
-
+                    const replyText = text.trim().toLowerCase();
                     let selectedIndex = -1;
 
                     // Valida NÚMERO (Fallback ou uso manual)
