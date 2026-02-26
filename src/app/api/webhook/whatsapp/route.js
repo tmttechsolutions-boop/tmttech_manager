@@ -35,10 +35,17 @@ export async function POST(req) {
             console.warn(`[WHATSAPP WEBHOOK] Instância "${instanceName}" não identificada ou sem empresa_id vinculado.`);
             return NextResponse.json({ message: 'Instância não mapeada.' }, { status: 200 });
         }
-        // Supondo uma estrutura genérica ou da Evolution API
+        // 2. Extrai dados básicos
+        const isFromMe = data.data?.key?.fromMe === true;
         const phone = data.data?.key?.remoteJid?.split('@')[0] || data.phone || '';
         const text = data.data?.message?.conversation || data.data?.message?.extendedTextMessage?.text || data.text || '';
         const isReplyStory = data.type === 'story_reply' || data.data?.message?.extendedTextMessage?.contextInfo?.isForwarded === false;
+
+        // SEGURANÇA: ignora se for uma mensagem enviada por nós mesmos (evita loop infinito)
+        if (isFromMe) {
+            console.log(`[WHATSAPP WEBHOOK] Ignorando mensagem disparada pelo próprio bot.`);
+            return NextResponse.json({ message: 'Ignore: message from me' }, { status: 200 });
+        }
 
         if (!phone || !text) {
             return NextResponse.json({ message: 'Mensagem vazia ou sem remetente ou é um evento interno ignorado.' }, { status: 200 });
