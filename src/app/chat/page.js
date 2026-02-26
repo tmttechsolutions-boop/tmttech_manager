@@ -13,6 +13,7 @@ export default function ChatPage() {
     const [newMessage, setNewMessage] = useState("");
     const [loadingLeads, setLoadingLeads] = useState(true);
     const [sending, setSending] = useState(false);
+    const [syncing, setSyncing] = useState(false);
 
     const messagesEndRef = useRef(null);
 
@@ -126,6 +127,30 @@ export default function ChatPage() {
         }
     };
 
+    const handleSyncHistory = async () => {
+        if (!empresaId || syncing) return;
+        setSyncing(true);
+        try {
+            const res = await fetch('/api/evolution/sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ empresaId })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                alert(`Sucesso! ${data.details.messagesSynced} mensagens sincronizadas e ${data.details.leadsCreated} novos contatos.`);
+                fetchActiveChats();
+            } else {
+                alert(`Erro na sincronização: ${data.error}`);
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Erro ao conectar com o servidor para sincronização.");
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     if (loadingEmpresa) return <div className="p-8">Carregando Empresa...</div>;
 
     return (
@@ -136,13 +161,25 @@ export default function ChatPage() {
                 <div style={{ padding: '24px', borderBottom: '1px solid var(--border-subtle)' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <h2 style={{ fontSize: '1.2rem' }}>Conversas</h2>
-                        <button
-                            onClick={fetchActiveChats}
-                            style={{ background: 'none', border: 'none', color: 'var(--brand-purple)', cursor: 'pointer', fontSize: '0.8rem' }}
-                            title="Atualizar lista"
-                        >
-                            🔄 Atualizar
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                                onClick={handleSyncHistory}
+                                disabled={syncing}
+                                style={{ background: 'none', border: 'none', color: syncing ? 'var(--text-muted)' : 'var(--brand-purple)', cursor: syncing ? 'default' : 'pointer', fontSize: '0.8rem' }}
+                                title="Importar conversas antigas"
+                            >
+                                {syncing ? '⌛ Sincronizando...' : '📥 Sincronizar'}
+                            </button>
+                            <button
+                                onClick={fetchActiveChats}
+                                style={{ background: 'none', border: 'none', color: 'var(--brand-purple)', cursor: 'pointer', fontSize: '0.8rem' }}
+                                title="Atualizar lista"
+                            >
+                                🔄 Atualizar
+                            </button>
+                        </div>
+                        village
+                        village
                     </div>
                     <input type="text" placeholder="Buscar contato..." className="form-input mt-4" style={{ fontSize: '0.85rem' }} />
                 </div>
