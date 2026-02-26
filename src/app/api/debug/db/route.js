@@ -9,7 +9,7 @@ export async function GET() {
         const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
         const keyClean = EVOLUTION_API_KEY?.trim() || '';
 
-        let evolutionAudit = { status: 'not_checked' };
+        let evolutionAudit = [];
         if (EVOLUTION_API_URL && keyClean) {
             try {
                 const res = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
@@ -17,12 +17,15 @@ export async function GET() {
                 });
                 const instances = await res.json();
 
-                // Mapeia o que está no Evolution Agora
-                evolutionAudit = Array.isArray(instances) ? instances.map(inst => ({
-                    name: inst.instanceName,
-                    connectionStatus: inst.status,
-                    phone: inst.ownerJid?.split('@')[0] || 'not-connected'
-                })) : { raw: instances };
+                if (Array.isArray(instances)) {
+                    evolutionAudit = instances.map(inst => ({
+                        instanceName: inst.instanceName,
+                        status: inst.status,
+                        owner: inst.ownerJid || 'not-connected'
+                    }));
+                } else {
+                    evolutionAudit = { error: 'Evolution returned non-array', raw: instances };
+                }
             } catch (e) {
                 evolutionAudit = { error: e.message };
             }
@@ -31,9 +34,9 @@ export async function GET() {
         const { data: empresas } = await supabase.from('empresas').select('id, nome, whatsapp_instance');
 
         return NextResponse.json({
-            debug_v: '3.2-instance-audit',
+            debug_v: '3.3-instance-map',
             evolutionAudit,
-            empresas_config: empresas
+            crm_config: empresas
         });
     } catch (err) {
         return NextResponse.json({ error: err.message });
