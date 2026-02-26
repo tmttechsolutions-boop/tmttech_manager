@@ -107,16 +107,21 @@ export async function POST(req) {
         // MOTOR DE REGRAS (MANYCHAT CLONE)
         // ==========================================
 
-        // 2. Busca TODAS as regras ativas de MENSAGENS e STORIES
+        // ==========================================
+        // MOTOR DE REGRAS (FLOW BUILDER & LEGACY)
+        // ==========================================
+
+        // 2. Busca TODAS as regras ativas de MENSAGENS e STORIES desta empresa
         const { data: rules } = await supabase
             .from('automation_rules')
             .select('*')
             .in('trigger_type', ['mensagem_qualquer', 'palavra_chave', 'resposta_story'])
             .eq('is_active', true)
+            .eq('empresa_id', empresaId)
             .eq('offset_minutes', 0); // Só regras que exigem disparo imediato
 
         if (!rules || rules.length === 0) {
-            return NextResponse.json({ message: 'Nenhuma regra de mensagem ativa encontrada.' }, { status: 200 });
+            return NextResponse.json({ message: 'Nenhuma regra de mensagem ativa encontrada para esta empresa.' }, { status: 200 });
         }
 
         let mensagensDisparadas = 0;
@@ -124,29 +129,20 @@ export async function POST(req) {
         for (const rule of rules) {
             let deveDisparar = false;
 
-            // Regra 1: Qualquer Mensagem
+            // Lógica de Gatilho
             if (rule.trigger_type === 'mensagem_qualquer') {
                 deveDisparar = true;
-            }
-
-            // Regra 2: Resposta a Story
-            if (rule.trigger_type === 'resposta_story' && isReplyStory) {
+            } else if (rule.trigger_type === 'resposta_story' && isReplyStory) {
                 deveDisparar = true;
-            }
-
-            // Regra 3: Palavra Chave Exata
-            if (rule.trigger_type === 'palavra_chave' && rule.trigger_keyword) {
+            } else if (rule.trigger_type === 'palavra_chave' && rule.trigger_keyword) {
                 const keywordText = rule.trigger_keyword.toLowerCase();
-                const messageText = text.toLowerCase();
-                // Verifica se a mensagem CONTÉM a palavra-chave
-                if (messageText.includes(keywordText)) {
+                if (text.toLowerCase().includes(keywordText)) {
                     deveDisparar = true;
                 }
             }
 
-            // Se o gatilho bateu, disparar!
             if (deveDisparar) {
-                // Verifica log
+                // Prevenção de Loop / Repetição Excessiva
                 const { data: logExistente } = await supabase
                     .from('message_logs')
                     .select('id')
@@ -154,30 +150,58 @@ export async function POST(req) {
                     .eq('lead_id', lead.id)
                     .single();
 
+                // Permitimos repetir palavra-chave, mas "qualquer mensagem" apenas uma vez por lead (padrão boas vindas)
                 if (!logExistente || rule.trigger_type === 'palavra_chave') {
-                    // Monta a mensagem final
-                    let mensagemFinal = rule.message_template
-                        .replace('{{nome}}', lead.nome)
-                        .replace('{{servico}}', 'seu serviço')
-                        .replace('{{hora}}', 'em breve');
 
-                    // AQUI NÓS DISPARAMOS PARA A EVOLUTION API REAL!
-                    console.log(`\n================================`);
-                    console.log(`🤖 [DISPARO AUTOMÁTICO - REGRA: ${rule.trigger_type}]`);
-                    const dispatch = await sendWhatsAppMessage(lead.telefone, mensagemFinal, empresaId);
-                    console.log(`================================\n`);
+                    let mensagensParaEnviar = [];
 
-                    // Registra log com o status real do envio
-                    await supabase.from('message_logs').insert([{
-                        rule_id: rule.id,
-                        lead_id: lead.id,
-                        empresa_id: lead.empresa_id,
-                        status: dispatch.success ? 'enviado' : 'erro',
-                        error_message: dispatch.success ? null : dispatch.error
-                    }]);
+                    // RESOLUÇÃO DO CONTEÚDO: Fluxo Visual ou Template Simples
+                    if (rule.flow_data && rule.flow_data.nodes) {
+                        // MOTOR DE FLUXO VISUAL (React Flow)
+                        const nodes = rule.flow_data.nodes;
+                        const edges = rule.flow_data.edges || [];
 
-                    mensagensDisparadas++;
-                    break;
+                        // Busca o nó de gatilho
+                        const triggerNode = nodes.find(n => n.type === 'trigger');
+                        if (triggerNode) {
+                            // Encontra conexões de saída do gatilho
+                            const connectedEdges = edges.filter(e => e.source === triggerNode.id);
+                            for (const edge of connectedEdges) {
+                                const targetNode = nodes.find(n => n.id === edge.target);
+                                // Se for um nó de ação com mensagem, extrai o texto
+                                if (targetNode && targetNode.type === 'action' && targetNode.data?.message) {
+                                    mensagensParaEnviar.push(targetNode.data.message);
+                                }
+                            }
+                        }
+                    } else if (rule.message_template) {
+                        // TEMPLATE LEGADO (Texto Simples)
+                        mensagensParaEnviar.push(rule.message_template);
+                    }
+
+                    // DISPAROS
+                    for (const rawMsg of mensagensParaEnviar) {
+                        let mensagemFinal = rawMsg
+                            .replace(/{{nome}}/g, lead.nome || 'cliente')
+                            .replace(/{{telefone}}/g, phone);
+
+                        console.log(`🤖 [AUTOMAÇÃO] Disparando para ${phone} via Regra: "${rule.name || rule.trigger_type}"`);
+                        const dispatch = await sendWhatsAppMessage(phone, mensagemFinal, empresaId);
+
+                        // Registra log
+                        await supabase.from('message_logs').insert([{
+                            rule_id: rule.id,
+                            lead_id: lead.id,
+                            empresa_id: empresaId,
+                            status: dispatch.success ? 'enviado' : 'erro',
+                            error_message: dispatch.success ? null : (dispatch.error || 'Erro desconhecido')
+                        }]);
+
+                        mensagensDisparadas++;
+                    }
+
+                    // Se disparou algo, interrompemos para este webhook (evita disparar múltiplas regras pra mesma msg)
+                    if (mensagensDisparadas > 0) break;
                 }
             }
         }
