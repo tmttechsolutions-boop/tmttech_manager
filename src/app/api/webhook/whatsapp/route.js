@@ -209,13 +209,13 @@ export async function POST(req) {
 
                     // DISPAROS
                     for (const rawMsg of mensagensParaEnviar) {
-                        // SUBSTITUIÇÃO DE VARIÁVEIS ROBUSTA
+                        // SUBSTITUIÇÃO DE VARIÁVEIS ROBUSTA (Case Insensitive)
                         let mensagemFinal = rawMsg
-                            .replace(/{{nome}}/g, lead.nome || 'cliente')
-                            .replace(/{nome}/g, lead.nome || 'cliente')
-                            .replace(/{Nome do contato}/g, lead.nome || 'cliente')
-                            .replace(/{{telefone}}/g, phone)
-                            .replace(/{telefone}/g, phone);
+                            .replace(/{{nome}}/gi, lead.nome || 'cliente')
+                            .replace(/{nome}/gi, lead.nome || 'cliente')
+                            .replace(/{Nome do contato}/gi, lead.nome || 'cliente')
+                            .replace(/{{telefone}}/gi, phone)
+                            .replace(/{telefone}/gi, phone);
 
                         console.log(`🤖 [AUTOMAÇÃO] Disparando para ${phone} via Regra: "${rule.name || rule.trigger_type}"`);
                         const dispatch = await sendWhatsAppMessage(phone, mensagemFinal, empresaId);

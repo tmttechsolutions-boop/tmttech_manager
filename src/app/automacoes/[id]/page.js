@@ -311,12 +311,36 @@ const FlowArea = () => {
                             <div className="form-group">
                                 <label>Texto do Conteúdo:</label>
                                 <textarea
+                                    id="message-textarea"
                                     className="form-input template-textarea"
                                     rows={6}
                                     value={selectedNode.data.message || ''}
                                     onChange={(e) => updateNodeData(selectedNode.id, { message: e.target.value })}
                                     placeholder="Escreva sua mensagem aqui..."
                                 />
+                                <div style={{ marginTop: '8px' }}>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '4px' }}>Inserir Variável:</p>
+                                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                        <button
+                                            className="variable-btn"
+                                            onClick={() => {
+                                                const current = selectedNode.data.message || "";
+                                                updateNodeData(selectedNode.id, { message: current + " {Nome}" });
+                                            }}
+                                        >
+                                            👤 Nome
+                                        </button>
+                                        <button
+                                            className="variable-btn"
+                                            onClick={() => {
+                                                const current = selectedNode.data.message || "";
+                                                updateNodeData(selectedNode.id, { message: current + " {Telefone}" });
+                                            }}
+                                        >
+                                            📞 Telefone
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -331,6 +355,19 @@ const FlowArea = () => {
                                     value={selectedNode.data.message || 'Selecione uma das opções disponíveis:'}
                                     onChange={(e) => updateNodeData(selectedNode.id, { message: e.target.value })}
                                 />
+                                <div style={{ marginTop: '8px' }}>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button
+                                            className="variable-btn"
+                                            onClick={() => {
+                                                const current = selectedNode.data.message || "";
+                                                updateNodeData(selectedNode.id, { message: current + " {Nome}" });
+                                            }}
+                                        >
+                                            👤 Nome
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label>Ações Adicionadas (Botões):</label>
