@@ -10,8 +10,16 @@ export async function POST(req) {
             return NextResponse.json({ error: 'leadId and empresaId are required' }, { status: 400 });
         }
 
+        // Limpa o log de automação clássico
         const { error } = await supabase
             .from('message_logs')
+            .delete()
+            .eq('lead_id', leadId)
+            .eq('empresa_id', empresaId);
+
+        // ESSENCIAL: Limpa também qualquer menu interativo travado para este lead
+        await supabase
+            .from('active_menus')
             .delete()
             .eq('lead_id', leadId)
             .eq('empresa_id', empresaId);
