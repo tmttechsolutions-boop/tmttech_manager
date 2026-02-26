@@ -3,7 +3,7 @@ import { createSupabaseClient } from '@/lib/supabase';
 
 export async function GET() {
     try {
-        const supabase = createSupabaseClient();
+        const supabase = createSupabaseClient(true); // Admin mode para teste
 
         // 1. Pega uma empresa válida para teste
         const { data: companies } = await supabase.from('empresas').select('id').limit(1);
@@ -13,38 +13,35 @@ export async function GET() {
         const { data: leads } = await supabase.from('leads').select('id').limit(1);
         const testLeadId = leads?.[0]?.id;
 
-        // 3. Tenta inserir e CAPTURAR ERRO
-        let insertStatus = "not_attempted";
+        // 3. Tenta inserir e CAPTURAR ERRO com ADMIN = TRUE
+        let adminInsertStatus = "not_attempted";
         if (testEmpresaId && testLeadId) {
             const { error } = await supabase.from('chat_messages').insert([{
                 empresa_id: testEmpresaId,
                 lead_id: testLeadId,
                 direction: 'inbound',
-                content: 'Teste de debug schema',
+                content: 'Teste de debug ADMIN RLS Bypass',
                 message_type: 'text'
             }]);
 
             if (error) {
-                insertStatus = `ERROR: ${error.code} - ${error.message} (${error.details})`;
+                adminInsertStatus = `ERROR: ${error.code} - ${error.message}`;
             } else {
-                insertStatus = "SUCCESS";
+                adminInsertStatus = "SUCCESS";
             }
-        } else {
-            insertStatus = "ABORTED: missing company or lead for test";
         }
 
-        // 4. Lista as colunas detectáveis (via tentativa de select *)
-        const { data: columnsData, error: columnsError } = await supabase
+        // 4. Lista as mensagens (deve vir o teste acima se deu sucesso)
+        const { data: messages } = await supabase
             .from('chat_messages')
             .select('*')
-            .limit(1);
+            .order('created_at', { ascending: false })
+            .limit(5);
 
         return NextResponse.json({
-            debug_v: '2.6-schema-audit',
-            insertStatus,
-            columnsError: columnsError?.message || null,
-            hasData: (columnsData?.length || 0) > 0,
-            testContext: { testEmpresaId, testLeadId }
+            debug_v: '2.7-admin-fix-test',
+            adminInsertStatus,
+            messages
         });
     } catch (err) {
         return NextResponse.json({ error: err.message });

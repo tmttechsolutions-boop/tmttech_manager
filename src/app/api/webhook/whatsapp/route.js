@@ -6,7 +6,7 @@ import { sendWhatsAppMessage } from '@/lib/evolution'; // Importando a API Real
 // Sempre que uma nova mensagem de um cliente chegar no seu número
 export async function POST(req) {
     try {
-        const supabase = createSupabaseClient();
+        const supabase = createSupabaseClient(true); // Admin mode para ignorar RLS no webhook
         const data = await req.json();
 
         // 1. Identifica a Empresa através do nome da Instância
