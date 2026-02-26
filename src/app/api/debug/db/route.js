@@ -3,24 +3,37 @@ import { createSupabaseClient } from '@/lib/supabase';
 
 export async function GET() {
     try {
-        const supabase = createSupabaseClient(true); // Admin client
+        const supabase = createSupabaseClient(true);
 
-        // 1. Audit Empresas
-        const { data: empresas } = await supabase
-            .from('empresas')
-            .select('*');
+        const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
+        const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
+        const keyClean = EVOLUTION_API_KEY?.trim() || '';
 
-        // 2. Audit Chat Messages
-        const { data: messages } = await supabase
-            .from('chat_messages')
-            .select('*, leads(nome, telefone)')
-            .order('created_at', { ascending: false })
-            .limit(20);
+        let evolutionAudit = { status: 'not_checked' };
+        if (EVOLUTION_API_URL && keyClean) {
+            try {
+                const res = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
+                    headers: { 'apikey': keyClean }
+                });
+                const instances = await res.json();
+
+                // Mapeia o que está no Evolution Agora
+                evolutionAudit = Array.isArray(instances) ? instances.map(inst => ({
+                    name: inst.instanceName,
+                    connectionStatus: inst.status,
+                    phone: inst.ownerJid?.split('@')[0] || 'not-connected'
+                })) : { raw: instances };
+            } catch (e) {
+                evolutionAudit = { error: e.message };
+            }
+        }
+
+        const { data: empresas } = await supabase.from('empresas').select('id, nome, whatsapp_instance');
 
         return NextResponse.json({
-            debug_v: '3.1-db-only-audit',
-            empresas,
-            messages
+            debug_v: '3.2-instance-audit',
+            evolutionAudit,
+            empresas_config: empresas
         });
     } catch (err) {
         return NextResponse.json({ error: err.message });
