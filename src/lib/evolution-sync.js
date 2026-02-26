@@ -60,6 +60,30 @@ export async function syncChatHistory(empresaId, instanceName) {
                 else if (pushNameLast && pushNameLast !== phone) realName = pushNameLast;
             }
 
+            // [NOVO] SE AINDA NÃO TEMOS UM NOME REAL, TENTA O FETCHPROFILE (ALTA FIDELIDADE)
+            if (!realName || realName === phone) {
+                try {
+                    console.log(`[SYNC] Nome não encontrado para ${phone}. Tentando fetchProfile...`);
+                    const profileRes = await fetch(`${EVOLUTION_API_URL}/chat/fetchProfile/${instanceName}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': EVOLUTION_API_KEY.trim()
+                        },
+                        body: JSON.stringify({ number: phone })
+                    });
+                    if (profileRes.ok) {
+                        const profileData = await profileRes.json();
+                        if (profileData.name && profileData.name !== phone) {
+                            realName = profileData.name;
+                            console.log(`[SYNC] Nome descoberto via fetchProfile para ${phone}: ${realName}`);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`[SYNC] Falha ao buscar profile para ${phone}:`, err.message);
+                }
+            }
+
             // 2.1 Garante que o Lead existe no banco
             let { data: lead } = await supabase
                 .from('leads')
@@ -85,8 +109,8 @@ export async function syncChatHistory(empresaId, instanceName) {
                 }
                 lead = newLead;
                 results.leadsCreated++;
-            } else if (realName && (lead.nome.startsWith('Contato ') || !lead.nome)) {
-                // Se o lead já existe mas o nome é genérico, atualiza para o nome real do WhatsApp
+            } else if (realName && (lead.nome.startsWith('Contato ') || !lead.nome || lead.nome === phone)) {
+                // Se o lead já existe mas o nome é genérico ou número, atualiza para o nome real descoberto
                 const { data: updatedLead } = await supabase
                     .from('leads')
                     .update({ nome: realName })
@@ -95,7 +119,7 @@ export async function syncChatHistory(empresaId, instanceName) {
                     .single();
                 if (updatedLead) {
                     lead = updatedLead;
-                    console.log(`[SYNC] Nome do Lead ${phone} atualizado para: ${realName}`);
+                    console.log(`[SYNC] Nome do Lead ${phone} corrigido para: ${realName}`);
                 }
             }
 
