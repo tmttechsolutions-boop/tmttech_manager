@@ -10,6 +10,13 @@ export async function GET() {
             .from('empresas')
             .select('*');
 
+        // 2. Busca últimos logs de mensagens para ver se o gatilho está funcionando
+        const { data: recentLogs } = await supabase
+            .from('message_logs')
+            .select('*, automation_rules(trigger_type, name)')
+            .order('created_at', { ascending: false })
+            .limit(5);
+
         const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
         const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
 
@@ -45,13 +52,14 @@ export async function GET() {
         })) || [];
 
         return NextResponse.json({
-            debug_v: '1.8-exhaustive-auth-test',
+            debug_v: '1.9-log-viewer',
             env_vars: {
                 EVOLUTION_API_URL,
                 key_length: EVOLUTION_API_KEY?.trim().length,
                 key_fragment: EVOLUTION_API_KEY ? `${EVOLUTION_API_KEY.trim().slice(0, 5)}...${EVOLUTION_API_KEY.trim().slice(-5)}` : 'MISSING'
             },
             instanceMapping,
+            recentLogs,
             authTests,
             db_error: empError?.message || null
         });
