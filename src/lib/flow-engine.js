@@ -67,6 +67,41 @@ export async function executeFlow({
             }]);
 
             // Pausa este ramo
+        } else if (targetNode.type === 'menu') {
+            // Lógica de MENU (Menu Interativo)
+            const buttons = targetNode.data.buttons || [];
+            if (buttons.length === 0) continue;
+
+            const phone = lead.telefone;
+
+            // Construir a mensagem com numeração
+            let menuText = targetNode.data.message || 'Selecione uma das opções:';
+            menuText = menuText
+                .replace(/{{nome}}/gi, lead.nome || 'cliente')
+                .replace(/{nome}/gi, lead.nome || 'cliente')
+                .replace(/{Nome do contato}/gi, lead.nome || 'cliente')
+                .replace(/{{telefone}}/gi, phone)
+                .replace(/{telefone}/gi, phone);
+
+            menuText += '\n\n';
+            buttons.forEach((btn, idx) => {
+                menuText += `${idx + 1} - ${btn}\n`;
+            });
+
+            console.log(`🤖 [FLOW ENGINE] Enviando Menu: ${targetNode.id}`);
+            await sendWhatsAppMessage(phone, menuText, empresaId);
+            messagesCount++;
+
+            // Registrar estado de menu ativo (Upsert garante apenas 1 por lead)
+            await supabase.from('active_menus').upsert({
+                empresa_id: empresaId,
+                lead_id: lead.id,
+                rule_id: ruleId,
+                node_id: targetNode.id,
+                created_at: new Date().toISOString()
+            }, { onConflict: 'lead_id' });
+
+            // PAUSAR O FLUXO (não propaga agora, apenas quando o cliente responder)
         }
     }
 

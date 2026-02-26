@@ -134,10 +134,82 @@ export async function POST(req) {
         }
 
         // ==========================================
+        // INTERCEPTADOR DE MENUS ATIVOS (Respostas)
+        // ==========================================
+        const { data: activeMenu } = await supabase
+            .from('active_menus')
+            .select('*')
+            .eq('lead_id', lead.id)
+            .maybeSingle();
+
+        if (activeMenu) {
+            console.log(`[WHATSAPP WEBHOOK] Lead ${lead.nome} está respondendo ao Menu: ${activeMenu.node_id}`);
+
+            const { data: rule } = await supabase
+                .from('automation_rules')
+                .select('flow_data')
+                .eq('id', activeMenu.rule_id)
+                .single();
+
+            if (rule && rule.flow_data) {
+                const nodes = rule.flow_data.nodes || [];
+                const edges = rule.flow_data.edges || [];
+
+                const menuNode = nodes.find(n => n.id === activeMenu.node_id);
+                if (menuNode) {
+                    const buttons = menuNode.data.buttons || [];
+                    const replyText = text.trim().toLowerCase();
+                    let selectedIndex = -1;
+
+                    // Valida NÚMERO
+                    const parsedNum = parseInt(replyText);
+                    if (!isNaN(parsedNum) && parsedNum >= 1 && parsedNum <= buttons.length) {
+                        selectedIndex = parsedNum - 1;
+                    } else {
+                        // Valida TEXTO EXATO
+                        selectedIndex = buttons.findIndex(btn => btn.toLowerCase() === replyText);
+                    }
+
+                    if (selectedIndex !== -1) {
+                        console.log(`[WHATSAPP WEBHOOK] Cliente escolheu opção: ${buttons[selectedIndex]}`);
+
+                        // Remove status de espera (avança o fluxo)
+                        await supabase.from('active_menus').delete().eq('id', activeMenu.id);
+
+                        // Executa o motor APENAS pelo caminho da opção escolhida
+                        const sourceHandleId = `btn-${selectedIndex}`;
+                        const matchingEdge = edges.find(e => e.source === activeMenu.node_id && e.sourceHandle === sourceHandleId);
+
+                        if (matchingEdge) {
+                            // Filtra as arestas para ignorar os outros botões do menu durante a execução
+                            const filteredEdges = edges.filter(e => e.source !== activeMenu.node_id || e.id === matchingEdge.id);
+
+                            await executeFlow({
+                                nodes,
+                                edges: filteredEdges,
+                                currentNodeId: activeMenu.node_id,
+                                lead,
+                                empresaId,
+                                ruleId: activeMenu.rule_id,
+                                supabase
+                            });
+                        }
+                    } else {
+                        // Resposta Inválida
+                        console.log(`[WHATSAPP WEBHOOK] Opção inválida.`);
+                        await sendWhatsAppMessage(phone, "Desculpe, opção inválida. Por favor, digite o *número* da opção desejada.", empresaId);
+                    }
+                    // Interrompe o processamento do webhook! O lead não pode acionar novos gatilhos genéricos enquanto está num menu (ou se responder a ele).
+                    return NextResponse.json({ message: 'Menu response handled' }, { status: 200 });
+                }
+            }
+        }
+
+
+        // ==========================================
         // MOTOR DE REGRAS (MANYCHAT CLONE)
         // ==========================================
 
-        // ==========================================
         // MOTOR DE REGRAS (FLOW BUILDER & LEGACY)
         // ==========================================
 
