@@ -33,13 +33,17 @@ export async function GET() {
 
         const { data: rules } = await supabase.from('automation_rules').select('*').limit(20);
         const { data: logs } = await supabase.from('message_logs').select('*, leads(nome, telefone), automation_rules(name)').order('created_at', { ascending: false }).limit(20);
+        const { data: activeMenus } = await supabase.from('active_menus').select('*, leads(nome, telefone)');
+        const { data: chats } = await supabase.from('chat_messages').select('content, direction, created_at, leads(nome)').order('created_at', { ascending: false }).limit(5);
 
         const { data: empresas } = await supabase.from('empresas').select('id, nome, whatsapp_instance');
 
         return NextResponse.json({
-            debug_v: '4.0-automation-audit',
+            debug_v: '4.2-automation-audit',
             evolutionAudit,
             crm_config: empresas,
+            activeMenus,
+            recentChats: chats,
             automations: rules,
             execution_logs: logs
         });
