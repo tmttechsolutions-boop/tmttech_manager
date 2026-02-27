@@ -100,8 +100,8 @@ export async function POST(req, { params }) {
         };
 
         // 5. Acionar o Motor de Fluxos a partir deste nó gatilho
-        // Não esperamos o await para não travar a resposta do webhook (fire and forget)
-        executeFlow({
+        // Await é CRUCIAL no Vercel para carregar o disparo antes da resposta
+        await executeFlow({
             nodes,
             edges,
             currentNodeId: triggerNode.id,
@@ -109,7 +109,7 @@ export async function POST(req, { params }) {
             empresaId,
             ruleId,
             supabase
-        }).catch(err => console.error("Erro assíncrono executando fluxo via Webhook Externo:", err));
+        });
 
         // 6. Retornar SUCESSO imediatamente para o App (Barbearia)
         return NextResponse.json({ success: true, message: 'Webhook processado e fluxo iniciado.', lead_id: lead.id }, { status: 200 });
