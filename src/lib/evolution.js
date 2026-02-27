@@ -110,6 +110,7 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
 /**
  * Envia um menu interativo com botões nativos do WhatsApp (Evolution API v2).
  * ATENÇÃO: O WhatsApp limite o envio de botões a no máximo 3 opções.
+ * buttonsArray pode ser ['Título'] ou [{id: 'custom-id', title: 'Título'}]
  */
 export async function sendWhatsAppInteractiveMenu(phone, text, buttonsArray, empresaId = null) {
     if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
@@ -147,24 +148,27 @@ export async function sendWhatsAppInteractiveMenu(phone, text, buttonsArray, emp
         console.log(`[EVOLUTION BUTTONS] Dispatching to: ${instanceName} | Phone: ${cleanPhone}`);
 
         // O WhatsApp suporta no MÁXIMO 3 botões por mensagem interativa.
-        // Se houver mais, vamos fazer fallback seguro para lista numerada em texto.
         if (buttonsArray.length > 3) {
             console.log(`⚠️ Mais de 3 botões listados. Fallback para lista de texto.`);
             let fallbackMenuText = text + '\n\n';
             buttonsArray.forEach((btn, idx) => {
-                fallbackMenuText += `${idx + 1} - ${btn}\n`;
+                const title = typeof btn === 'string' ? btn : btn.title;
+                fallbackMenuText += `${idx + 1} - ${title}\n`;
             });
             return await sendWhatsAppMessage(phone, fallbackMenuText, targetEmpresaId);
         }
 
         // Formata os botões para o padrão da Evolution API
-        const formattedButtons = buttonsArray.map((btnTitle, index) => ({
-            type: "reply",
-            reply: {
-                id: `btn-${index}`, // Usamos o mesmo ID de sourceHandle para facilitar a busca, mas nem precisamos validar isso depois
-                title: btnTitle.substring(0, 20) // whatsapp limita a string grande, limitando a 20 pra evitar erros
-            }
-        }));
+        const formattedButtons = buttonsArray.map((btn, index) => {
+            const isObj = typeof btn === 'object';
+            return {
+                type: "reply",
+                reply: {
+                    id: isObj ? btn.id : `btn-${index}`,
+                    title: (isObj ? btn.title : btn).substring(0, 20)
+                }
+            };
+        });
 
         const payload = {
             number: cleanPhone,

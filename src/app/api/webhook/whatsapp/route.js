@@ -63,17 +63,18 @@ export async function POST(req) {
 
         const text = data.data?.message?.conversation || data.data?.message?.extendedTextMessage?.text || data.text || '';
         const isReplyStory = data.type === 'story_reply' || data.data?.message?.extendedTextMessage?.contextInfo?.isForwarded === false;
+        const buttonId = data.data?.message?.buttonsResponseMessage?.selectedButtonId || '';
 
         // FILTRO: Ignora mensagens de grupos para não poluir o CRM
         if (isGroup) {
             return NextResponse.json({ message: 'Ignore: group message' }, { status: 200 });
         }
 
-        if (!phone || !text) {
+        if (!phone && !buttonId) {
             return NextResponse.json({ message: 'Mensagem vazia ou sem remetente ou é um evento interno ignorado.' }, { status: 200 });
         }
 
-        console.log(`[WHATSAPP WEBHOOK] Processando mensagem de "${pushName}" (${phone}) (fromMe: ${isFromMe}): "${text.substring(0, 30)}..."`);
+        console.log(`[WHATSAPP WEBHOOK] Processando mensagem de "${pushName}" (${phone}) (buttonId: ${buttonId}): "${text.substring(0, 30)}..."`);
 
         // 1. Tenta achar quem é esse lead no banco.
         let { data: lead } = await supabase
@@ -81,6 +82,29 @@ export async function POST(req) {
             .select('*')
             .eq('telefone', phone)
             .maybeSingle();
+
+        // [INTERCEPTADOR DE AGENDAMENTO]
+        if (buttonId.startsWith('ag_')) {
+            const [_, action, agId] = buttonId.split('_'); // ag_confirm_ID ou ag_reject_ID
+            console.log(`[WHATSAPP WEBHOOK] Interceptando resposta de agendamento: ${action} para ID ${agId}`);
+
+            if (action === 'confirm' || action === 'reject') {
+                const newStatus = action === 'confirm' ? 'confirmado' : 'cancelado';
+                const { error: upError } = await supabase
+                    .from('agendamentos')
+                    .update({ status: newStatus })
+                    .eq('id', agId);
+
+                if (!upError) {
+                    const responseMsg = action === 'confirm'
+                        ? '✅ Seu agendamento foi confirmado com sucesso! Te esperamos aqui.'
+                        : '❌ Agendamento cancelado. Se precisar marcar outro horário, estamos à disposição.';
+                    await sendWhatsAppMessage(phone, responseMsg, empresaId);
+                }
+
+                return NextResponse.json({ message: `Appointment ${action} processed` });
+            }
+        }
 
         // Se o lead não existe, cadastra ele automaticamente como novo!
         if (!lead) {
