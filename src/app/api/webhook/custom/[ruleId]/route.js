@@ -10,8 +10,7 @@ import { executeFlow } from '@/lib/flow-engine';
 export async function POST(req, { params }) {
     try {
         const { ruleId } = params;
-        const url = new URL(req.url, 'http://localhost');
-        const empresaId = url.searchParams.get('empresaId');
+        const empresaId = req.nextUrl.searchParams.get('empresaId');
 
         if (!ruleId || !empresaId) {
             return NextResponse.json({ error: 'ruleId (URL param) and empresaId (Query param) are required.' }, { status: 400 });
