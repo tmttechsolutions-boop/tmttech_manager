@@ -28,6 +28,14 @@ export async function GET(req) {
                     }
                 });
 
+                // Teste extra da URL sugerida pelo usuário
+                try {
+                    const managerRes = await fetch('https://evo.testen8n.com.br/manager/', { method: 'HEAD' });
+                    evolutionAudit.manager_url_status = managerRes.status;
+                } catch (mErr) {
+                    evolutionAudit.manager_url_error = mErr.message;
+                }
+
                 if (res.ok) {
                     const instances = await res.json().catch(() => []);
                     evolutionAudit.status = 'connected';
