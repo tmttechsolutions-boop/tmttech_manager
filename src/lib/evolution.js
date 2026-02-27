@@ -40,18 +40,35 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
         console.log(`[EVOLUTION] Dispatching to: ${instanceName} | Phone: ${cleanPhone}`);
 
         // Ajuste para Evolution v2: o texto deve ser uma propriedade 'text' direta no objeto
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'apikey': EVOLUTION_API_KEY.trim(),
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            body: JSON.stringify({
-                number: cleanPhone,
-                text: text
-            })
-        });
+        const headers = {
+            'Content-Type': 'application/json',
+            'apikey': EVOLUTION_API_KEY.trim(),
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache'
+        };
+
+        let response;
+        let attempt = 0;
+        const maxAttempts = 2;
+
+        while (attempt < maxAttempts) {
+            response = await fetch(endpoint, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    number: cleanPhone,
+                    text: text
+                })
+            });
+
+            if (response.status !== 502) break;
+            attempt++;
+            if (attempt < maxAttempts) {
+                console.log(`[EVOLUTION] 502 detected. Retrying in 1s... (Attempt ${attempt})`);
+                await new Promise(r => setTimeout(r, 1000));
+            }
+        }
 
 
         const result = await response.json().catch(() => ({}));
