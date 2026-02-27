@@ -41,6 +41,21 @@ export async function GET(req) {
             } catch (e) {
                 evolutionAudit = { error: e.message };
             }
+
+            // TESTE EXTRA: Conectividade básica do Vercel
+            try {
+                const testRes = await fetch('https://www.google.com', { method: 'HEAD' });
+                evolutionAudit.vercel_to_google = `Success: ${testRes.status}`;
+            } catch (err) {
+                evolutionAudit.vercel_to_google = `Failed: ${err.message}`;
+            }
+
+            try {
+                const restRoot = await fetch(EVOLUTION_API_URL, { method: 'GET' });
+                evolutionAudit.vercel_to_evo_root = `Status: ${restRoot.status}`;
+            } catch (err) {
+                evolutionAudit.vercel_to_evo_root = `Failed: ${err.message}`;
+            }
         }
 
         const { searchParams } = new URL(req.url);
