@@ -89,9 +89,10 @@ export async function POST(req, { params }) {
             }
         }
 
-        // 5. LIMPEZA DE SESSÃO: Se o lead estava preso em um menu anterior, 
-        // a chegada do webhook de confirmação deve "liberá-lo".
+        // 5. LIMPEZA DE SESSÃO E COOLDOWN: Se o lead estava preso em um menu anterior, 
+        // ou já tinha disparado automações recentemente, a chegada do webhook deve "zerar" tudo.
         await supabase.from('active_menus').delete().eq('lead_id', lead.id);
+        await supabase.from('message_logs').delete().eq('lead_id', lead.id);
 
         console.log(`[EXTERNAL WEBHOOK] Iniciando Fluxo ${rule.name} para o lead ${lead.nome} (${lead.telefone})`);
 
