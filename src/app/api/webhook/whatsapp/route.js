@@ -259,16 +259,15 @@ export async function POST(req) {
                 if (!logExistente || rule.trigger_type === 'palavra_chave') {
                     canTrigger = true;
                 } else {
-                    // Se já disparou, permitimos repetir apenas se o último log for de MAIS de 24 HORAS (Sessão encerrada)
+                    // Se já disparou, permitimos repetir apenas se o último log for de MAIS de 30 MINUTOS (Sessão encerada)
                     const lastExecution = new Date(logExistente.created_at);
                     const now = new Date();
-                    const diffHours = (now - lastExecution) / (1000 * 60 * 60);
+                    const diffMinutes = (now - lastExecution) / (1000 * 60);
 
-                    // Para TESTES do usuário, vamos reduzir para 5 minutos se for uma regra marcada (OPCIONAL) 
-                    // Mas por padrão seguimos a regra de 24h do ManyChat
-                    if (diffHours >= 24) {
+                    // Para TESTES e dinâmica de Barbearia, reduzimos para 30 minutos em vez de 24h
+                    if (diffMinutes >= 30) {
                         canTrigger = true;
-                        console.log(`[AUTOMAÇÃO] Reiniciando fluxo para ${lead.nome} - Sessão de 24h expirada.`);
+                        console.log(`[AUTOMAÇÃO] Reiniciando fluxo para ${lead.nome} - Intervalo de 30min expirado.`);
                     }
                 }
 

@@ -89,6 +89,10 @@ export async function POST(req, { params }) {
             }
         }
 
+        // 5. LIMPEZA DE SESSÃO: Se o lead estava preso em um menu anterior, 
+        // a chegada do webhook de confirmação deve "liberá-lo".
+        await supabase.from('active_menus').delete().eq('lead_id', lead.id);
+
         console.log(`[EXTERNAL WEBHOOK] Iniciando Fluxo ${rule.name} para o lead ${lead.nome} (${lead.telefone})`);
 
         // OPTIONAL: Inyectar variáveis dinâmicas (extraData) no Lead temporariamente
@@ -111,7 +115,15 @@ export async function POST(req, { params }) {
             supabase
         });
 
-        // 6. Retornar SUCESSO imediatamente para o App (Barbearia)
+        // 6. Registrar log de execução para o Webhook (Previne duplicação se desejado)
+        await supabase.from('message_logs').insert([{
+            rule_id: ruleId,
+            lead_id: lead.id,
+            empresa_id: empresaId,
+            status: 'enviado'
+        }]);
+
+        // 7. Retornar SUCESSO imediatamente para o App (Barbearia)
         return NextResponse.json({ success: true, message: 'Webhook processado e fluxo iniciado.', lead_id: lead.id }, { status: 200 });
 
     } catch (error) {
