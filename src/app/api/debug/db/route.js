@@ -44,6 +44,21 @@ export async function GET(req) {
                         state: inst.status,
                         owner: inst.ownerJid
                     }));
+
+                    // Auditar Webhooks da Instância Ativa
+                    try {
+                        const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'tmttech_manager';
+                        const wRes = await fetch(`${EVOLUTION_API_URL}/webhook/find/${instanceName}`, {
+                            headers: { 'apikey': keyClean }
+                        });
+                        if (wRes.ok) {
+                            evolutionAudit.webhooks = await wRes.json().catch(() => ({}));
+                        } else {
+                            evolutionAudit.webhooks_error = `Fetch failed: ${wRes.status}`;
+                        }
+                    } catch (wErr) {
+                        evolutionAudit.webhooks_error = wErr.message;
+                    }
                 } else {
                     const errText = await res.text().catch(() => 'no-body');
                     evolutionAudit.status = 'error-' + res.status;
