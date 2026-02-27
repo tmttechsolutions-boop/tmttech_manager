@@ -18,16 +18,25 @@ export async function GET() {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                     }
                 });
-                const instances = await res.json();
-
-                if (Array.isArray(instances)) {
-                    evolutionAudit = instances.map(inst => ({
-                        instanceName: inst.instanceName,
-                        status: inst.status,
-                        owner: inst.ownerJid || 'not-connected'
-                    }));
-                } else {
-                    evolutionAudit = { error: 'Evolution returned non-array', raw: instances };
+                const resCloneForError = res.clone();
+                try {
+                    const instances = await res.json();
+                    if (Array.isArray(instances)) {
+                        evolutionAudit = instances.map(inst => ({
+                            instanceName: inst.instanceName,
+                            status: inst.status,
+                            owner: inst.ownerJid || 'not-connected'
+                        }));
+                    } else {
+                        evolutionAudit = { error: 'Evolution returned non-array', raw: instances };
+                    }
+                } catch (jsonErr) {
+                    const textContent = await resCloneForError.text();
+                    evolutionAudit = {
+                        error: 'JSON Parse Error (Server returned HTML)',
+                        status: res.status,
+                        preview: textContent.substring(0, 500)
+                    };
                 }
             } catch (e) {
                 evolutionAudit = { error: e.message };
