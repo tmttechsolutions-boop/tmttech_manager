@@ -52,11 +52,20 @@ export async function GET(req) {
             const agDateTime = parseAppointmentDateTime(ag.appointment_date, ag.appointment_time);
             if (!agDateTime) continue;
 
+            const url = new URL(req.url);
+            const testPhone = url.searchParams.get('testPhone');
+
+            // Formatar telefone (A Evolution requer código do país 55 para o Brasil)
+            let cleanPhone = ag.clients.phone.replace(/\D/g, '');
+            if (!cleanPhone.startsWith('55')) {
+                cleanPhone = `55${cleanPhone}`;
+            }
+
             // LÓGICA DA JANELA MÓVEL E ESTRITA (15 minutos):
-            // O agendamento DEVE estar EXATAMENTE entre "Agora + 2h" e "Agora + 2h15m"
-            // Isso evita disparos retroativos se o cron não rodar, e garante que rodando a cada 15 min
-            // ele pega blocos exatos (ex: cron roda 14:00, pega agendamentos de 16:00 a 16:15)
-            if (agDateTime > twoHoursFromNow && agDateTime <= twoHoursAndFifteenFromNow) {
+            const isTimeMatch = agDateTime > twoHoursFromNow && agDateTime <= twoHoursAndFifteenFromNow;
+            const isTestMatch = testPhone && cleanPhone === testPhone;
+
+            if (isTimeMatch || isTestMatch) {
 
                 const timeStr = ag.appointment_time.substring(0, 5); // "HH:mm"
                 const dateParts = ag.appointment_date.split('-');
@@ -71,12 +80,6 @@ export async function GET(req) {
                     { id: `ext_ag_confirm_${ag.id}`, title: 'Confirmar' },
                     { id: `ext_ag_reject_${ag.id}`, title: 'Rejeitar' }
                 ];
-
-                // Formatar telefone (A Evolution requer código do país 55 para o Brasil)
-                let cleanPhone = ag.clients.phone.replace(/\D/g, '');
-                if (!cleanPhone.startsWith('55')) {
-                    cleanPhone = `55${cleanPhone}`;
-                }
 
                 console.log(`[CRON EXTR] Enviando lembrete para: ${cleanPhone} (Ag: ${ag.id})`);
 
