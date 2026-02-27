@@ -9,7 +9,8 @@ import { executeFlow } from '@/lib/flow-engine';
  */
 export async function POST(req, { params }) {
     try {
-        const { ruleId } = params;
+        const resolvedParams = await params;
+        const { ruleId } = resolvedParams;
         const empresaId = req.nextUrl.searchParams.get('empresaId');
 
         if (!ruleId || !empresaId) {
