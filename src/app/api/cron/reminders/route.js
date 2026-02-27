@@ -1,71 +1,104 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/supabase';
-import { sendWhatsAppInteractiveMenu } from '@/lib/evolution';
+import { sendWhatsAppInteractiveMenu, sendWhatsAppMessage } from '@/lib/evolution';
+import { createClient } from '@supabase/supabase-js';
 
-// Rota de Polling: Consulta agendamentos pendentes para enviar lembretes com botões
+// Função auxiliar para criar a data exata do agendamento a partir das colunas
+function parseAppointmentDateTime(dateStr, timeStr) {
+    if (!dateStr || !timeStr) return null;
+    // Assume Formato: dateStr "YYYY-MM-DD", timeStr "HH:mm:ss"
+    return new Date(`${dateStr}T${timeStr}-03:00`); // Assumindo fuso de Brasília fixo para barbearias no BR
+}
+
 export async function GET(req) {
     try {
-        const supabase = createSupabaseClient(true);
+        const EXTERNAL_URL = process.env.EXTERNAL_SUPABASE_URL;
+        const EXTERNAL_KEY = process.env.EXTERNAL_SUPABASE_ANON_KEY;
+
+        if (!EXTERNAL_URL || !EXTERNAL_KEY) {
+            throw new Error("Credenciais do banco de dados externo não configuradas (.env.local).");
+        }
+
+        const supabaseExternal = createClient(EXTERNAL_URL, EXTERNAL_KEY);
+
         const now = new Date();
+        const futureLimit = new Date(now.getTime() + (2.25 * 60 * 60 * 1000)); // Agora + 2h15m
 
-        // Janela de tempo: Agora até Agora + 2h15min
-        const futureLimit = new Date(now.getTime() + (2.25 * 60 * 60 * 1000));
+        console.log(`[CRON EXTR] Buscando agendamentos pendentes... Limit: ${futureLimit.toISOString()}`);
 
-        console.log(`[CRON REMINDERS] Buscando agendamentos entre ${now.toISOString()} e ${futureLimit.toISOString()}`);
+        // 1. Busca todos pendentes que ainda não receberam lembrete
+        // Como o BD usa colunas separadas (date, time), trazemos tudo que for >= hoje (pra não puxar passado antigo)
+        const todayStr = now.toISOString().split('T')[0];
 
-        // Busca agendamentos pendentes dentro da janela
-        const { data: agendamentos, error: agError } = await supabase
-            .from('agendamentos')
-            .select('*, leads(id, nome, telefone)')
+        const { data: appointments, error: appError } = await supabaseExternal
+            .from('appointments')
+            .select('*, clients(name, phone)')
             .eq('status', 'pendente')
             .eq('reminder_sent', false)
-            .gte('date_time', now.toISOString())
-            .lte('date_time', futureLimit.toISOString());
+            .gte('appointment_date', todayStr);
 
-        if (agError) throw agError;
+        if (appError) throw appError;
 
-        if (!agendamentos || agendamentos.length === 0) {
-            return NextResponse.json({ message: 'Nenhum agendamento pendente na janela de 2h15.' });
+        if (!appointments || appointments.length === 0) {
+            return NextResponse.json({ message: 'Nenhum agendamento pendente encontrado no banco externo.' });
         }
 
         let sentCount = 0;
 
-        for (const ag of agendamentos) {
-            if (!ag.leads || !ag.leads.telefone) continue;
+        for (const ag of appointments) {
+            if (!ag.clients || !ag.clients.phone) continue;
 
-            const agDate = new Date(ag.date_time);
-            const timeStr = agDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-            const dateStr = agDate.toLocaleDateString('pt-BR');
+            const agDateTime = parseAppointmentDateTime(ag.appointment_date, ag.appointment_time);
+            if (!agDateTime) continue;
 
-            const message = `Olá, ${ag.leads.nome}! ✨\n\nPassando para lembrar do seu agendamento.\n\n📅 Data: ${dateStr}\n🕒 Hora: ${timeStr}\n🛠️ Serviço: ${ag.service || 'Procedimento'}\n\nPodemos confirmar sua presença?`;
+            // LÓGICA DA JANELA:
+            // "horário é menor ou igual a Agora + 2h15min"
+            // E maior que "Agora" (para não mandar msg de coisas que já passaram, caso o cron atrase)
+            if (agDateTime <= futureLimit && agDateTime >= now) {
 
-            const buttons = [
-                { id: `ag_confirm_${ag.id}`, title: 'Confirmar' },
-                { id: `ag_reject_${ag.id}`, title: 'Rejeitar' }
-            ];
+                const timeStr = ag.appointment_time.substring(0, 5); // "HH:mm"
+                const dateParts = ag.appointment_date.split('-');
+                const dateStr = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
 
-            console.log(`[CRON REMINDERS] Enviando lembrete para: ${ag.leads.telefone} (Ag: ${ag.id})`);
+                // Extrai primeiro nome
+                const clientName = ag.clients.name ? ag.clients.name.split(' ')[0] : 'Cliente';
 
-            const result = await sendWhatsAppInteractiveMenu(ag.leads.telefone, message, buttons, ag.empresa_id);
+                const message = `Olá, ${clientName}! ✨\n\nPassando para lembrar do seu agendamento.\n\n📅 Data: ${dateStr}\n🕒 Hora: ${timeStr}\n\nPodemos confirmar sua presença?`;
 
-            if (result.success) {
-                // Marca como enviado imediatamente
-                await supabase
-                    .from('agendamentos')
-                    .update({ reminder_sent: true })
-                    .eq('id', ag.id);
+                const buttons = [
+                    { id: `ext_ag_confirm_${ag.id}`, title: 'Confirmar' },
+                    { id: `ext_ag_reject_${ag.id}`, title: 'Rejeitar' }
+                ];
 
-                sentCount++;
+                console.log(`[CRON EXTR] Enviando lembrete para: ${ag.clients.phone} (Ag: ${ag.id})`);
+
+                // Dispara pela Evolution (Usando a instância global/default do CRM)
+                const result = await sendWhatsAppInteractiveMenu(ag.clients.phone, message, buttons);
+
+                if (result.success) {
+                    // Update IMEDIATO no banco externo
+                    const { error: upError } = await supabaseExternal
+                        .from('appointments')
+                        .update({ reminder_sent: true })
+                        .eq('id', ag.id);
+
+                    if (upError) {
+                        console.error(`[CRON EXTR] Erro ao marcar reminder_sent para ${ag.id}:`, upError);
+                    } else {
+                        sentCount++;
+                    }
+                }
             }
         }
 
         return NextResponse.json({
-            message: 'Processamento de lembretes concluído.',
+            message: 'Processamento de lembretes externos concluído.',
+            total_avaliados: appointments.length,
             total_enviados: sentCount
         });
 
     } catch (error) {
-        console.error('[CRON REMINDERS ERROR]:', error);
+        console.error('[CRON EXTR ERROR]:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

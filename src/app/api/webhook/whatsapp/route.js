@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/supabase';
 import { sendWhatsAppMessage } from '@/lib/evolution';
 import { executeFlow } from '@/lib/flow-engine';
-// Importando a API Real
+import { createClient } from '@supabase/supabase-js'; // Para o banco externo
 
 // Esta rota será chamada pela Evolution API ou pela API Oficial do WhatsApp
 // Sempre que uma nova mensagem de um cliente chegar no seu número
@@ -76,33 +76,44 @@ export async function POST(req) {
 
         console.log(`[WHATSAPP WEBHOOK] Processando mensagem de "${pushName}" (${phone}) (buttonId: ${buttonId}): "${text.substring(0, 30)}..."`);
 
-        // 1. Tenta achar quem é esse lead no banco.
+        // 1. Tenta achar quem é esse lead no banco local.
         let { data: lead } = await supabase
             .from('leads')
             .select('*')
             .eq('telefone', phone)
             .maybeSingle();
 
-        // [INTERCEPTADOR DE AGENDAMENTO]
-        if (buttonId.startsWith('ag_')) {
-            const [_, action, agId] = buttonId.split('_'); // ag_confirm_ID ou ag_reject_ID
-            console.log(`[WHATSAPP WEBHOOK] Interceptando resposta de agendamento: ${action} para ID ${agId}`);
+        // [INTERCEPTADOR DE AGENDAMENTO EXTERNO]
+        if (buttonId.startsWith('ext_ag_')) {
+            const [_, __, action, agId] = buttonId.split('_'); // ext_ag_confirm_ID ou ext_ag_reject_ID
+            console.log(`[WHATSAPP WEBHOOK] Interceptando resposta de agendamento EXTERNO: ${action} para ID ${agId}`);
 
             if (action === 'confirm' || action === 'reject') {
-                const newStatus = action === 'confirm' ? 'confirmado' : 'cancelado';
-                const { error: upError } = await supabase
-                    .from('agendamentos')
-                    .update({ status: newStatus })
-                    .eq('id', agId);
+                const EXTERNAL_URL = process.env.EXTERNAL_SUPABASE_URL;
+                const EXTERNAL_KEY = process.env.EXTERNAL_SUPABASE_ANON_KEY;
 
-                if (!upError) {
-                    const responseMsg = action === 'confirm'
-                        ? '✅ Seu agendamento foi confirmado com sucesso! Te esperamos aqui.'
-                        : '❌ Agendamento cancelado. Se precisar marcar outro horário, estamos à disposição.';
-                    await sendWhatsAppMessage(phone, responseMsg, empresaId);
+                if (EXTERNAL_URL && EXTERNAL_KEY) {
+                    const supabaseExternal = createClient(EXTERNAL_URL, EXTERNAL_KEY);
+                    const newStatus = action === 'confirm' ? 'confirmado' : 'cancelado';
+
+                    const { error: upError } = await supabaseExternal
+                        .from('appointments')
+                        .update({ status: newStatus })
+                        .eq('id', agId);
+
+                    if (!upError) {
+                        const responseMsg = action === 'confirm'
+                            ? '✅ Seu agendamento foi confirmado com sucesso! Te esperamos aqui.'
+                            : '❌ Agendamento cancelado. Se precisar marcar outro horário, estamos à disposição.';
+                        await sendWhatsAppMessage(phone, responseMsg, empresaId);
+                    } else {
+                        console.error('[WHATSAPP WEBHOOK] Erro ao atualizar banco externo:', upError);
+                    }
+                } else {
+                    console.error('[WHATSAPP WEBHOOK] Faltam variáveis de ambiente para o banco externo.');
                 }
 
-                return NextResponse.json({ message: `Appointment ${action} processed` });
+                return NextResponse.json({ message: `External appointment ${action} processed` });
             }
         }
 
