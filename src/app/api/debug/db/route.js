@@ -2,66 +2,77 @@ import { NextResponse } from 'next/server';
 import { createSupabaseClient } from '@/lib/supabase';
 
 export async function GET(req) {
-    const ver = "5.1-final-debug-" + Date.now();
-
-    const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
-    const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
-    const keyClean = EVOLUTION_API_KEY?.trim() || '';
-
-    let debug = {
-        version: ver,
-        env: {
-            url: EVOLUTION_API_URL,
-            key_set: !!EVOLUTION_API_KEY
-        },
-        tests: {}
-    };
-
-    // 1. Google Test
     try {
-        const gRes = await fetch('https://www.google.com', { method: 'HEAD' });
-        debug.tests.google = gRes.status;
-    } catch (e) {
-        debug.tests.google = 'Error: ' + e.message;
-    }
+        const supabase = createSupabaseClient(true);
+        const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
+        const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
+        const keyClean = EVOLUTION_API_KEY?.trim() || '';
 
-    // 2. Evolution GET Test
-    if (EVOLUTION_API_URL) {
-        try {
-            const res = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
-                headers: {
-                    'apikey': keyClean,
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        let evolutionAudit = {
+            status: 'unknown',
+            ts: Date.now(),
+            vercel_to_google: 'not-tested'
+        };
+
+        if (EVOLUTION_API_URL && keyClean) {
+            try {
+                // Teste de Google para base de rede
+                const gRes = await fetch('https://www.google.com', { method: 'HEAD' });
+                evolutionAudit.vercel_to_google = `Success: ${gRes.status}`;
+
+                // Teste de Evolution (GET Instances)
+                const res = await fetch(`${EVOLUTION_API_URL}/instance/fetchInstances`, {
+                    headers: {
+                        'apikey': keyClean,
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    }
+                });
+
+                if (res.ok) {
+                    const instances = await res.json().catch(() => []);
+                    evolutionAudit.status = 'connected';
+                    evolutionAudit.instances = instances.map(inst => ({
+                        name: inst.instanceName,
+                        state: inst.status,
+                        owner: inst.ownerJid
+                    }));
+                } else {
+                    const errText = await res.text().catch(() => 'no-body');
+                    evolutionAudit.status = 'error-' + res.status;
+                    evolutionAudit.preview = errText.substring(0, 200);
                 }
-            });
-            debug.tests.evo_get_status = res.status;
-            const text = await res.text();
-            debug.tests.evo_get_preview = text.substring(0, 50);
-        } catch (e) {
-            debug.tests.evo_get_error = e.message;
+            } catch (e) {
+                evolutionAudit.error = e.message;
+            }
         }
 
-        // 3. Evolution POST Test
-        try {
-            const pRes = await fetch(`${EVOLUTION_API_URL}/message/sendText/tmttech_manager`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'apikey': keyClean,
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                },
-                body: JSON.stringify({
-                    number: "553788123971",
-                    text: "DEBUG: Teste v5.1"
-                })
-            });
-            debug.tests.evo_post_status = pRes.status;
-            const pText = await pRes.text();
-            debug.tests.evo_post_preview = pText.substring(0, 50);
-        } catch (e) {
-            debug.tests.evo_post_error = e.message;
+        const { searchParams } = new URL(req.url);
+        const reset = searchParams.get('reset');
+
+        if (reset === 'true') {
+            await supabase.from('active_menus').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            await supabase.from('message_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+            return NextResponse.json({ success: true, message: 'Sessions and logs cleared' });
         }
+
+        // Dados do CRM
+        const { data: rules } = await supabase.from('automation_rules').select('*').limit(20);
+        const { data: logs } = await supabase.from('message_logs').select('*, leads(nome, telefone), automation_rules(name)').order('created_at', { ascending: false }).limit(20);
+        const { data: activeMenus } = await supabase.from('active_menus').select('*, leads(nome, telefone)');
+        const { data: chats } = await supabase.from('chat_messages').select('content, direction, created_at, leads(nome)').order('created_at', { ascending: false }).limit(10);
+
+        const { data: empresas } = await supabase.from('empresas').select('id, nome, whatsapp_instance');
+
+        return NextResponse.json({
+            debug_v: "5.2-full-audit",
+            evolutionAudit,
+            crm_config: empresas,
+            activeMenus,
+            recentChats: chats,
+            automations: rules,
+            execution_logs: logs
+        });
+    } catch (err) {
+        return NextResponse.json({ error: err.message });
     }
-
-    return NextResponse.json(debug);
 }
