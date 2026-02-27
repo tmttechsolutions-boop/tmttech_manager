@@ -7,12 +7,15 @@ export async function GET(req) {
 
     const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
     const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
+    const keyClean = EVOLUTION_API_KEY?.trim() || '';
+    const targetUrl = `${EVOLUTION_API_URL}/instance/fetchInstances`;
 
     let debug = {
         version: ver,
         env: {
             url_set: !!EVOLUTION_API_URL,
-            url_val: EVOLUTION_API_URL?.substring(0, 15) + '...',
+            url_val: EVOLUTION_API_URL,
+            url_exact: targetUrl,
             key_set: !!EVOLUTION_API_KEY
         },
         tests: {}
@@ -27,8 +30,11 @@ export async function GET(req) {
 
     if (EVOLUTION_API_URL) {
         try {
-            const eRes = await fetch(EVOLUTION_API_URL + '/instance/fetchInstances', {
-                headers: { 'apikey': EVOLUTION_API_KEY?.trim() || '' }
+            const res = await fetch(targetUrl, {
+                headers: {
+                    'apikey': keyClean,
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
             });
             debug.tests.evo_instances_status = eRes.status;
             const text = await eRes.text();
