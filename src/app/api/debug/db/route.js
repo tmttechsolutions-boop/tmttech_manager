@@ -77,7 +77,7 @@ export async function GET(req) {
         const { data: empresas } = await supabase.from('empresas').select('id, nome, whatsapp_instance');
 
         return NextResponse.json({
-            debug_v: '4.3-automation-audit',
+            debug_v: `4.4-automation-audit-${Date.now()}`,
             evolutionAudit,
             crm_config: empresas,
             activeMenus,
