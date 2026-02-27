@@ -44,7 +44,8 @@ export async function sendWhatsAppMessage(phone, text, empresaId = null) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': EVOLUTION_API_KEY.trim()
+                'apikey': EVOLUTION_API_KEY.trim(),
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
             body: JSON.stringify({
                 number: cleanPhone,
@@ -164,7 +165,8 @@ export async function sendWhatsAppInteractiveMenu(phone, text, buttonsArray, emp
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'apikey': EVOLUTION_API_KEY.trim()
+                'apikey': EVOLUTION_API_KEY.trim(),
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
             },
             body: JSON.stringify(payload)
         });
