@@ -84,16 +84,50 @@ export async function POST(req) {
             .maybeSingle();
 
         // [INTERCEPTADOR DE AGENDAMENTO EXTERNO]
-        if (buttonId.startsWith('ext_ag_')) {
-            const [_, __, action, agId] = buttonId.split('_'); // ext_ag_confirm_ID ou ext_ag_reject_ID
-            console.log(`[WHATSAPP WEBHOOK] Interceptando resposta de agendamento EXTERNO: ${action} para ID ${agId}`);
+        const replyNormalized = text.trim().toLowerCase();
 
-            if (action === 'confirm' || action === 'reject') {
-                const EXTERNAL_URL = process.env.EXTERNAL_SUPABASE_URL;
-                const EXTERNAL_KEY = process.env.EXTERNAL_SUPABASE_ANON_KEY;
+        if (buttonId.startsWith('ext_ag_') || ['1', '2', 'confirmar', 'rejeitar', 'cancelar'].includes(replyNormalized)) {
+            let action = null;
+            let agId = null;
 
-                if (EXTERNAL_URL && EXTERNAL_KEY) {
-                    const supabaseExternal = createClient(EXTERNAL_URL, EXTERNAL_KEY);
+            if (buttonId.startsWith('ext_ag_')) {
+                const [_, __, btnAction, btnAgId] = buttonId.split('_');
+                action = btnAction;
+                agId = btnAgId;
+            }
+
+            const EXTERNAL_URL = process.env.EXTERNAL_SUPABASE_URL;
+            const EXTERNAL_KEY = process.env.EXTERNAL_SUPABASE_ANON_KEY;
+
+            if (EXTERNAL_URL && EXTERNAL_KEY) {
+                const supabaseExternal = createClient(EXTERNAL_URL, EXTERNAL_KEY);
+
+                // If it was a TEXT reply, we need to find the agId
+                if (!agId) {
+                    const { data: pendingAppointments } = await supabaseExternal
+                        .from('appointments')
+                        .select('id, status, clients(phone)')
+                        .eq('status', 'pendente')
+                        .eq('reminder_sent', true)
+                        .gte('appointment_date', new Date().toISOString().split('T')[0]);
+
+                    if (pendingAppointments) {
+                        const targetApp = pendingAppointments.find(app => {
+                            if (!app.clients || !app.clients.phone) return false;
+                            let cleanAppPhone = app.clients.phone.replace(/\D/g, '');
+                            if (!cleanAppPhone.startsWith('55')) cleanAppPhone = `55${cleanAppPhone}`;
+                            return cleanAppPhone === phone;
+                        });
+
+                        if (targetApp) {
+                            agId = targetApp.id;
+                            action = (replyNormalized === '1' || replyNormalized === 'confirmar') ? 'confirm' : 'reject';
+                        }
+                    }
+                }
+
+                if (agId && action) {
+                    console.log(`[WHATSAPP WEBHOOK] Interceptando resposta de agendamento EXTERNO: ${action} para ID ${agId}`);
                     const newStatus = action === 'confirm' ? 'confirmado' : 'cancelado';
 
                     const { error: upError } = await supabaseExternal
@@ -106,14 +140,11 @@ export async function POST(req) {
                             ? '✅ Seu agendamento foi confirmado com sucesso! Te esperamos aqui.'
                             : '❌ Agendamento cancelado. Se precisar marcar outro horário, estamos à disposição.';
                         await sendWhatsAppMessage(phone, responseMsg, empresaId);
+                        return NextResponse.json({ message: `External appointment ${action} processed` });
                     } else {
                         console.error('[WHATSAPP WEBHOOK] Erro ao atualizar banco externo:', upError);
                     }
-                } else {
-                    console.error('[WHATSAPP WEBHOOK] Faltam variáveis de ambiente para o banco externo.');
                 }
-
-                return NextResponse.json({ message: `External appointment ${action} processed` });
             }
         }
 

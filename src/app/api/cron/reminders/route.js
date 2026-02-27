@@ -74,17 +74,12 @@ export async function GET(req) {
                 // Extrai primeiro nome
                 const clientName = ag.clients.name ? ag.clients.name.split(' ')[0] : 'Cliente';
 
-                const message = `Olá, ${clientName}! ✨\n\nPassando para lembrar do seu agendamento.\n\n📅 Data: ${dateStr}\n🕒 Hora: ${timeStr}\n\nPodemos confirmar sua presença?`;
+                const message = `Olá, ${clientName}! ✨\n\nPassando para lembrar do seu agendamento.\n\n📅 Data: ${dateStr}\n🕒 Hora: ${timeStr}\n\nPodemos confirmar sua presença?\n\nResponda essa mensagem com:\n*1* - Para Confirmar ✅\n*2* - Para Cancelar ❌`;
 
-                const buttons = [
-                    { id: `ext_ag_confirm_${ag.id}`, title: 'Confirmar' },
-                    { id: `ext_ag_reject_${ag.id}`, title: 'Rejeitar' }
-                ];
-
-                console.log(`[CRON EXTR] Enviando lembrete para: ${cleanPhone} (Ag: ${ag.id})`);
+                console.log(`[CRON EXTR] Enviando lembrete texto para: ${cleanPhone} (Ag: ${ag.id})`);
 
                 // Dispara pela Evolution (Usando a instância global/default do CRM)
-                const result = await sendWhatsAppInteractiveMenu(cleanPhone, message, buttons);
+                const result = await sendWhatsAppMessage(cleanPhone, message);
 
                 if (result.success) {
                     // Update IMEDIATO no banco externo
