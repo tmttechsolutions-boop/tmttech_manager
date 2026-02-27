@@ -22,9 +22,10 @@ export async function GET(req) {
         const supabaseExternal = createClient(EXTERNAL_URL, EXTERNAL_KEY);
 
         const now = new Date();
-        const futureLimit = new Date(now.getTime() + (2.25 * 60 * 60 * 1000)); // Agora + 2h15m
+        const twoHoursFromNow = new Date(now.getTime() + (2 * 60 * 60 * 1000));
+        const twoHoursAndFifteenFromNow = new Date(now.getTime() + (2.25 * 60 * 60 * 1000));
 
-        console.log(`[CRON EXTR] Buscando agendamentos pendentes... Limit: ${futureLimit.toISOString()}`);
+        console.log(`[CRON EXTR] Buscando agendamentos pendentes... Limit: ${twoHoursAndFifteenFromNow.toISOString()}`);
 
         // 1. Busca todos pendentes que ainda não receberam lembrete
         // Como o BD usa colunas separadas (date, time), trazemos tudo que for >= hoje (pra não puxar passado antigo)
@@ -51,10 +52,11 @@ export async function GET(req) {
             const agDateTime = parseAppointmentDateTime(ag.appointment_date, ag.appointment_time);
             if (!agDateTime) continue;
 
-            // LÓGICA DA JANELA:
-            // "horário é menor ou igual a Agora + 2h15min"
-            // E maior que "Agora" (para não mandar msg de coisas que já passaram, caso o cron atrase)
-            if (agDateTime <= futureLimit && agDateTime >= now) {
+            // LÓGICA DA JANELA MÓVEL E ESTRITA (15 minutos):
+            // O agendamento DEVE estar EXATAMENTE entre "Agora + 2h" e "Agora + 2h15m"
+            // Isso evita disparos retroativos se o cron não rodar, e garante que rodando a cada 15 min
+            // ele pega blocos exatos (ex: cron roda 14:00, pega agendamentos de 16:00 a 16:15)
+            if (agDateTime > twoHoursFromNow && agDateTime <= twoHoursAndFifteenFromNow) {
 
                 const timeStr = ag.appointment_time.substring(0, 5); // "HH:mm"
                 const dateParts = ag.appointment_date.split('-');
