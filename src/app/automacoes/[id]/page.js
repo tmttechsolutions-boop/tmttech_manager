@@ -198,9 +198,9 @@ const FlowArea = () => {
 
         const mainTrigger = triggerNodes[0];
 
-        // Pega as info do gatilho (Se não tiver, usa padrão)
-        const triggerType = 'mensagem_qualquer'; // Isso poderia vir do mainTrigger.data
-        const keyword = mainTrigger.data.keyword || '';
+        // Pega as info do gatilho
+        const triggerType = mainTrigger.data?.triggerType || 'mensagem_qualquer';
+        const keyword = mainTrigger.data?.keyword || '';
 
         const flowPayload = {
             nodes: nodes,
