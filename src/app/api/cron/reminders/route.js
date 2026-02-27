@@ -72,10 +72,16 @@ export async function GET(req) {
                     { id: `ext_ag_reject_${ag.id}`, title: 'Rejeitar' }
                 ];
 
-                console.log(`[CRON EXTR] Enviando lembrete para: ${ag.clients.phone} (Ag: ${ag.id})`);
+                // Formatar telefone (A Evolution requer código do país 55 para o Brasil)
+                let cleanPhone = ag.clients.phone.replace(/\D/g, '');
+                if (!cleanPhone.startsWith('55')) {
+                    cleanPhone = `55${cleanPhone}`;
+                }
+
+                console.log(`[CRON EXTR] Enviando lembrete para: ${cleanPhone} (Ag: ${ag.id})`);
 
                 // Dispara pela Evolution (Usando a instância global/default do CRM)
-                const result = await sendWhatsAppInteractiveMenu(ag.clients.phone, message, buttons);
+                const result = await sendWhatsAppInteractiveMenu(cleanPhone, message, buttons);
 
                 if (result.success) {
                     // Update IMEDIATO no banco externo
