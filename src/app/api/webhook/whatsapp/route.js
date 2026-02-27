@@ -181,6 +181,7 @@ export async function POST(req) {
                         const sourceHandleId = `btn-${selectedIndex}`;
                         const matchingEdge = edges.find(e => e.source === activeMenu.node_id && e.sourceHandle === sourceHandleId);
 
+                        // 1.8.1 Se encontrou a opção, executa e encerra.
                         if (matchingEdge) {
                             // Filtra as arestas para ignorar os outros botões do menu durante a execução
                             const filteredEdges = edges.filter(e => e.source !== activeMenu.node_id || e.id === matchingEdge.id);
@@ -194,14 +195,17 @@ export async function POST(req) {
                                 ruleId: activeMenu.rule_id,
                                 supabase
                             });
+
+                            return NextResponse.json({ message: 'Menu response handled' }, { status: 200 });
                         }
                     } else {
-                        // Resposta Inválida
-                        console.log(`[WHATSAPP WEBHOOK] Opção inválida.`);
-                        await sendWhatsAppMessage(phone, "Desculpe, opção inválida. Por favor, digite o *número* da opção desejada.", empresaId);
+                        // Resposta Inválida: Não fazemos nada e deixamos o fluxo seguir para o MOTOR DE REGRAS.
+                        // Isso permite que um "Oi" ou outra palavra-chave quebre o menu e reinicie o atendimento.
+                        console.log(`[WHATSAPP WEBHOOK] Mensagem não condiz com menu. Tentando Motor de Regras...`);
+
+                        // Opcional: Limpar o menu ativo para não ficar tentando validar contra ele para sempre
+                        await supabase.from('active_menus').delete().eq('id', activeMenu.id);
                     }
-                    // Interrompe o processamento do webhook! O lead não pode acionar novos gatilhos genéricos enquanto está num menu (ou se responder a ele).
-                    return NextResponse.json({ message: 'Menu response handled' }, { status: 200 });
                 }
             }
         }
