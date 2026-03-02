@@ -74,15 +74,82 @@ export async function GET(req) {
                 // Extrai primeiro nome
                 const clientName = ag.clients.name ? ag.clients.name.split(' ')[0] : 'Cliente';
 
-                const message = `Olá, ${clientName}! ✨\n\nPassando para lembrar do seu agendamento.\n\n📅 Data: ${dateStr}\n🕒 Hora: ${timeStr}\n\nPodemos confirmar sua presença?\n\nResponda essa mensagem com:\n*1* - Para Confirmar ✅\n*2* - Para Cancelar ❌`;
+                console.log(`[CRON EXTR] Agendamento prestes a ocorrer: ${cleanPhone} (Ag: ${ag.id})`);
 
-                console.log(`[CRON EXTR] Enviando lembrete texto para: ${cleanPhone} (Ag: ${ag.id})`);
+                // 2. Busca regra de automação que seja do tipo "remetente_2h" ativa
+                const supabaseLocal = createSupabaseClient(true);
+                const { data: activeRules } = await supabaseLocal
+                    .from('automation_rules')
+                    .select('*')
+                    .eq('is_active', true);
 
-                // Dispara pela Evolution (Usando a instância global/default do CRM)
-                const result = await sendWhatsAppMessage(cleanPhone, message);
+                let targetRule = null;
+                let triggerNodeId = null;
 
-                if (result.success) {
-                    // Update IMEDIATO no banco externo
+                if (activeRules) {
+                    for (const rule of activeRules) {
+                        const flowData = rule.flow_data || {};
+                        const nodes = flowData.nodes || [];
+                        const triggerNode = nodes.find(n => n.type === 'trigger' && n.data?.triggerType === 'remetente_2h');
+                        if (triggerNode) {
+                            targetRule = rule;
+                            triggerNodeId = triggerNode.id;
+                            break;
+                        }
+                    }
+                }
+
+                if (!targetRule) {
+                    console.log(`[CRON EXTR] Nenhuma automação visual ativa com o gatilho "Lembrete 2h".`);
+                    // Fallback cancelado. Se não tem regra, não envia nada e continua.
+                    continue;
+                }
+
+                // 3. Garante que o Lead existe localmente para podermos usar o Flow Engine
+                const empresaId = targetRule.empresa_id;
+                let { data: lead } = await supabaseLocal
+                    .from('leads')
+                    .select('*')
+                    .eq('telefone', cleanPhone)
+                    .eq('empresa_id', empresaId)
+                    .maybeSingle();
+
+                if (!lead) {
+                    const { data: newLead } = await supabaseLocal
+                        .from('leads')
+                        .insert([{
+                            nome: clientName,
+                            telefone: cleanPhone,
+                            empresa_id: empresaId,
+                            status: 'novo'
+                        }])
+                        .select()
+                        .single();
+                    lead = newLead;
+                }
+
+                // Injeta as variáveis de agendamento transientes no objeto Lead
+                // para o replaceVars() do flow-engine capturar
+                lead.data_agendamento = dateStr;
+                lead.hora_agendamento = timeStr;
+
+                // 4. Executa o Flow Visual (Import dinâmico para evitar dependência circular pesada se houver)
+                const { executeFlow } = await import('@/lib/flow-engine');
+
+                console.log(`[CRON EXTR] Iniciando Flow visual "${targetRule.name}" para ${cleanPhone}`);
+
+                try {
+                    await executeFlow({
+                        nodes: targetRule.flow_data.nodes,
+                        edges: targetRule.flow_data.edges || [],
+                        currentNodeId: triggerNodeId,
+                        lead: lead,
+                        empresaId: empresaId,
+                        ruleId: targetRule.id,
+                        supabase: supabaseLocal
+                    });
+
+                    // Update IMEDIATO no banco externo marcando que já recebeu o aviso
                     const { error: upError } = await supabaseExternal
                         .from('appointments')
                         .update({ reminder_sent: true })
@@ -93,6 +160,8 @@ export async function GET(req) {
                     } else {
                         sentCount++;
                     }
+                } catch (err) {
+                    console.error(`[CRON EXTR] Erro fatal durante a execução do Lembrete Flow:`, err);
                 }
             }
         }

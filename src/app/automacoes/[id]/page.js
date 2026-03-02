@@ -386,8 +386,23 @@ const FlowArea = () => {
                                     <option value="mensagem_qualquer">O usuário envia uma mensagem</option>
                                     <option value="palavra_chave">Mensagem contém Palavra-Chave</option>
                                     <option value="webhook">Webhook Externo (Site/App)</option>
+                                    <option value="remetente_2h">⏰ Lembrete 2h (Agendamento)</option>
                                 </select>
                             </div>
+
+                            {selectedNode.data.triggerType === 'remetente_2h' && (
+                                <div className="form-group mt-4">
+                                    <div style={{ padding: '12px', backgroundColor: 'rgba(234, 179, 8, 0.15)', border: '1px solid var(--warning)', borderRadius: '8px' }}>
+                                        <p style={{ fontSize: '0.8rem', color: 'var(--warning)', margin: 0 }}>
+                                            <strong>⏳ Disparo Automático (Cron)</strong><br />
+                                            Este fluxo será iniciado automaticamente pelo sistema sempre que faltarem 2 horas para o agendamento de um cliente.<br /><br />
+                                            <strong>Novas variáveis disponíveis no texto:</strong><br />
+                                            <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '4px' }}>{'{data_agendamento}'}</code><br />
+                                            <code style={{ background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '4px' }}>{'{hora_agendamento}'}</code>
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
 
                             {selectedNode.data.triggerType === 'palavra_chave' && (
                                 <div className="form-group">
