@@ -21,6 +21,7 @@ import ActionNode from '@/components/flow/ActionNode';
 import MenuNode from '@/components/flow/MenuNode';
 import DelayNode from '@/components/flow/DelayNode';
 import ConditionNode from '@/components/flow/ConditionNode';
+import HttpNode from '@/components/flow/HttpNode';
 import CustomEdge from '@/components/flow/CustomEdge';
 
 // Nossos blocos customizados
@@ -30,6 +31,7 @@ const nodeTypes = {
     menu: MenuNode,
     delay: DelayNode,
     condition: ConditionNode,
+    http: HttpNode,
 };
 
 const edgeTypes = {
@@ -132,6 +134,13 @@ const DragAndDropSidebar = () => {
                 </div>
                 <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'trigger', 'Webhook Externo')} draggable>
                     <span className="icon" style={{ color: '#ec4899' }}>🔗</span> Webhook Externo
+                </div>
+            </div>
+
+            <div className="dnd-category">
+                <div className="dnd-category-title">Integrações Genéricas</div>
+                <div className="dnd-node" onDragStart={(event) => onDragStart(event, 'http', 'Requisição HTTP')} draggable>
+                    <span className="icon" style={{ color: '#38bdf8' }}>🔗</span> Requisição HTTP
                 </div>
             </div>
 
@@ -411,6 +420,48 @@ const FlowArea = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {selectedNode.type === 'http' && (
+                        <div className="rule-form">
+                            <div className="form-group">
+                                <label>Método de Envio:</label>
+                                <select
+                                    className="form-input"
+                                    value={selectedNode.data.method || 'POST'}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { method: e.target.value })}
+                                >
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="PATCH">PATCH</option>
+                                    <option value="DELETE">DELETE</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>URL de Destino:</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="https://sua-api.com/webhook"
+                                    value={selectedNode.data.url || ''}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { url: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="form-group">
+                                <label>Body (JSON Opcional):</label>
+                                <HighlightedTextarea
+                                    id="http-body"
+                                    rows={5}
+                                    value={selectedNode.data.body || ''}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { body: e.target.value })}
+                                    placeholder='{ "status": "cancelado", "phone": "{Telefone}" }'
+                                    className="font-mono text-sm"
+                                />
+                            </div>
                         </div>
                     )}
 

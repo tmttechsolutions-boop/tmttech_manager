@@ -110,9 +110,51 @@ export async function executeFlow({
 
             console.log(`🤖 [FLOW ENGINE] Enviando Menu (Texto Clássico): ${targetNode.id}`);
             await sendWhatsAppMessage(phone, menuText, empresaId);
-            messagesCount++;
-
             // PAUSAR O FLUXO (não propaga agora, apenas quando o cliente responder)
+        } else if (targetNode.type === 'http') {
+            // Lógica de Requisição HTTP (Webhook)
+            const method = targetNode.data.method || 'POST';
+            let url = targetNode.data.url || '';
+            let body = targetNode.data.body || '';
+
+            const phone = lead.telefone;
+            const replaceVars = (text) => {
+                if (!text) return text;
+                let res = text
+                    .replace(/{{nome}}/gi, lead.nome)
+                    .replace(/{nome}/gi, lead.nome)
+                    .replace(/{{telefone}}/gi, phone)
+                    .replace(/{telefone}/gi, phone);
+
+                Object.keys(lead).forEach(key => {
+                    if (key !== 'nome' && key !== 'telefone' && typeof lead[key] === 'string') {
+                        res = res.replace(new RegExp(`{{${key}}}`, 'gi'), lead[key])
+                            .replace(new RegExp(`{${key}}`, 'gi'), lead[key]);
+                    }
+                });
+                return res;
+            };
+
+            url = replaceVars(url);
+            body = replaceVars(body);
+
+            try {
+                const options = { method, headers: {} };
+                if (method !== 'GET' && method !== 'HEAD' && body) {
+                    options.body = body;
+                    options.headers['Content-Type'] = 'application/json';
+                }
+
+                console.log(`🔗 [FLOW ENGINE] Executando HTTP ${method} para ${url}`);
+                const response = await fetch(url, options);
+                console.log(`🔗 [FLOW ENGINE] Resposta HTTP: ${response.status} ${response.statusText}`);
+            } catch (err) {
+                console.error(`🔗 [FLOW ENGINE] Erro na Requisição HTTP:`, err);
+            }
+
+            // Continua o fluxo imediatamente
+            const subCount = await executeFlow({ nodes, edges, currentNodeId: targetNode.id, lead, empresaId, ruleId, supabase });
+            messagesCount += subCount;
         }
 
     }

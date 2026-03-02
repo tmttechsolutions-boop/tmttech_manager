@@ -22,10 +22,9 @@ export async function GET(req) {
         const supabaseExternal = createClient(EXTERNAL_URL, EXTERNAL_KEY);
 
         const now = new Date();
-        const twoHoursFromNow = new Date(now.getTime() + (2 * 60 * 60 * 1000));
-        const twoHoursAndFifteenFromNow = new Date(now.getTime() + (2.25 * 60 * 60 * 1000));
+        const maxReminderWindow = new Date(now.getTime() + (2.25 * 60 * 60 * 1000)); // Agora + 2h15m
 
-        console.log(`[CRON EXTR] Buscando agendamentos pendentes... Limit: ${twoHoursAndFifteenFromNow.toISOString()}`);
+        console.log(`[CRON EXTR] Buscando agendamentos pendentes... Limit: ${maxReminderWindow.toISOString()}`);
 
         // 1. Busca todos pendentes que ainda não receberam lembrete
         // Como o BD usa colunas separadas (date, time), trazemos tudo que for >= hoje (pra não puxar passado antigo)
@@ -61,8 +60,9 @@ export async function GET(req) {
                 cleanPhone = `55${cleanPhone}`;
             }
 
-            // LÓGICA DA JANELA MÓVEL E ESTRITA (15 minutos):
-            const isTimeMatch = agDateTime > twoHoursFromNow && agDateTime <= twoHoursAndFifteenFromNow;
+            // LÓGICA DA JANELA À PROVA DE FALHAS:
+            // Dispara se o agendamento ocorrer nas próximas 2h15m e ainda estiver no futuro.
+            const isTimeMatch = agDateTime <= maxReminderWindow && agDateTime > now;
             const isTestMatch = testPhone && cleanPhone === testPhone;
 
             if (isTimeMatch || isTestMatch) {
