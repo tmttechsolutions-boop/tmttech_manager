@@ -197,11 +197,24 @@ export default function ChatPage() {
         }
         return true; // Aba de contatos mostra todos
     }).reduce((acc, current) => {
-        // Filtra para mostrar apenas 1 lead por número de telefone na interface
-        const x = acc.find(item => item.telefone === current.telefone);
-        if (!x) {
+        // Normaliza o telefone do Brasil para evitar duplicados por causa do 9º dígito
+        // Ex: 5537998070486 (com 9) vira 553798070486 (sem 9)
+        const normalizePhone = (phone) => {
+            if (!phone) return "";
+            let p = phone.replace(/\D/g, '');
+            if (p.startsWith('55') && p.length === 13) {
+                p = p.substring(0, 4) + p.substring(5);
+            }
+            return p;
+        };
+
+        const currentNorm = normalizePhone(current.telefone);
+        const exists = acc.find(item => normalizePhone(item.telefone) === currentNorm);
+
+        if (!exists) {
             return acc.concat([current]);
         } else {
+            // Se já existe, mantemos o mais recente/preenchido (neste caso o primeiro que veio do order by desc)
             return acc;
         }
     }, []);
