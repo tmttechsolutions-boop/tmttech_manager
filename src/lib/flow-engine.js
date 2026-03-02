@@ -92,6 +92,15 @@ export async function executeFlow({
                 .replace(/{{telefone}}/gi, phone)
                 .replace(/{telefone}/gi, phone);
 
+            // Injeção de variáveis extras (ex: vindas do Webhook/Cron)
+            Object.keys(lead).forEach(key => {
+                if (key !== 'nome' && key !== 'telefone' && typeof lead[key] === 'string') {
+                    const regex1 = new RegExp(`{{${key}}}`, 'gi');
+                    const regex2 = new RegExp(`{${key}}`, 'gi');
+                    menuText = menuText.replace(regex1, lead[key]).replace(regex2, lead[key]);
+                }
+            });
+
             menuText += '\n\n';
             buttons.forEach((btn, idx) => {
                 menuText += `${idx + 1} - ${btn}\n`;
