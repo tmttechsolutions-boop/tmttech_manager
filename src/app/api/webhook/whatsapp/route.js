@@ -235,6 +235,15 @@ export async function POST(req) {
             return NextResponse.json({ message: 'Nenhuma regra de mensagem ativa encontrada para esta empresa.' }, { status: 200 });
         }
 
+        // Ordena para garantir que gatilhos Específicos (Palavras/Stories) sejam avaliados
+        // ANTES do gatilho genérico (Mensagem Qualquer). Assim o Fallback só roda se nada específico bater.
+        const priorityOrder = {
+            'palavra_chave': 1,
+            'resposta_story': 2,
+            'mensagem_qualquer': 3
+        };
+        rules.sort((a, b) => (priorityOrder[a.trigger_type] || 99) - (priorityOrder[b.trigger_type] || 99));
+
         let mensagensDisparadas = 0;
 
         for (const rule of rules) {
