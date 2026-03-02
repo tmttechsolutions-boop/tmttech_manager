@@ -112,11 +112,19 @@ export async function POST(req) {
                         .gte('appointment_date', new Date().toISOString().split('T')[0]);
 
                     if (pendingAppointments) {
+                        const normalizePhone = (p) => {
+                            if (!p) return "";
+                            let str = p.replace(/\D/g, '');
+                            if (!str.startsWith('55')) str = `55${str}`;
+                            if (str.length === 13) str = str.substring(0, 4) + str.substring(5); // Remove 9º dígito
+                            return str;
+                        };
+                        const webhookPhoneNorm = normalizePhone(phone);
+
                         const targetApp = pendingAppointments.find(app => {
                             if (!app.clients || !app.clients.phone) return false;
-                            let cleanAppPhone = app.clients.phone.replace(/\D/g, '');
-                            if (!cleanAppPhone.startsWith('55')) cleanAppPhone = `55${cleanAppPhone}`;
-                            return cleanAppPhone === phone;
+                            const dbPhoneNorm = normalizePhone(app.clients.phone);
+                            return dbPhoneNorm === webhookPhoneNorm;
                         });
 
                         if (targetApp) {
