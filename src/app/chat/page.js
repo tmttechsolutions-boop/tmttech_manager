@@ -184,7 +184,7 @@ export default function ChatPage() {
         }
     };
 
-    const filteredLeads = leads.filter(lead => {
+    const filteredLeadsUniques = leads.filter(lead => {
         const matchesSearch =
             lead.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
             lead.telefone.includes(searchQuery);
@@ -196,7 +196,17 @@ export default function ChatPage() {
             return lead.chat_messages && lead.chat_messages.length > 0;
         }
         return true; // Aba de contatos mostra todos
-    });
+    }).reduce((acc, current) => {
+        // Filtra para mostrar apenas 1 lead por número de telefone na interface
+        const x = acc.find(item => item.telefone === current.telefone);
+        if (!x) {
+            return acc.concat([current]);
+        } else {
+            return acc;
+        }
+    }, []);
+
+    const filteredLeads = filteredLeadsUniques;
 
     if (loadingEmpresa) return <div className="p-8 text-center">Carregando Empresa...</div>;
 
