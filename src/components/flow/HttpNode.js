@@ -17,6 +17,11 @@ export default function HttpNode({ data, selected }) {
                     <span style={{ fontSize: '0.8em', opacity: 0.8 }}>
                         {data.url ? (data.url.length > 30 ? `${data.url.substring(0, 30)}...` : data.url) : 'Nenhuma URL configurada'}
                     </span>
+                    {data.headers && (
+                        <div style={{ marginTop: '4px', fontSize: '0.7em', color: 'var(--success)' }}>
+                            🗝️ Com Headers Customizados
+                        </div>
+                    )}
                 </div>
             </div>
             <Handle type="source" position={Position.Right} id="b" className="node-handle source-handle" />

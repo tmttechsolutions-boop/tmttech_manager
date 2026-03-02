@@ -140,6 +140,19 @@ export async function executeFlow({
 
             try {
                 const options = { method, headers: {} };
+
+                // Parse Custom Headers se houver
+                if (targetNode.data.headers && targetNode.data.headers.trim() !== '') {
+                    try {
+                        let parsedHeaders = JSON.parse(targetNode.data.headers);
+                        for (const key in parsedHeaders) {
+                            options.headers[key] = replaceVars(parsedHeaders[key]);
+                        }
+                    } catch (e) {
+                        console.error(`🔗 [FLOW ENGINE] JSON de Headers inválido no node ${targetNode.id}:`, e.message);
+                    }
+                }
+
                 if (method !== 'GET' && method !== 'HEAD' && body) {
                     options.body = body;
                     options.headers['Content-Type'] = 'application/json';

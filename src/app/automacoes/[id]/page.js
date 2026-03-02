@@ -452,6 +452,17 @@ const FlowArea = () => {
                             </div>
 
                             <div className="form-group">
+                                <label>Headers (JSON Opcional):</label>
+                                <textarea
+                                    className="form-input font-mono text-sm"
+                                    rows={3}
+                                    placeholder='{"Authorization": "Bearer token", "apikey": "key"}'
+                                    value={selectedNode.data.headers || ''}
+                                    onChange={(e) => updateNodeData(selectedNode.id, { headers: e.target.value })}
+                                />
+                            </div>
+
+                            <div className="form-group">
                                 <label>Body (JSON Opcional):</label>
                                 <HighlightedTextarea
                                     id="http-body"
