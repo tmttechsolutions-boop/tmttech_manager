@@ -167,8 +167,9 @@ export async function POST(req) {
                 return NextResponse.json({ message: 'Falha ao processar novo contato.' }, { status: 200 });
             }
             lead = newLead;
-        } else if (pushName && lead.nome.startsWith('Contato ')) {
-            // Pequena melhoria: se o lead já existia mas com nome genérico, e agora temos o pushName, atualiza!
+        } else if (pushName && pushName !== lead.nome) {
+            // Pequena melhoria: se o lead já existia mas com nome diferente do WhatsApp oficial (ex: agendado como "Teste" ou salvo com nome genérico),
+            // damos preferência absoluta para a identificação nativa (pushName) enviada pelo WhatsApp do cliente.
             const { data: updatedLead } = await supabase
                 .from('leads')
                 .update({ nome: pushName })
