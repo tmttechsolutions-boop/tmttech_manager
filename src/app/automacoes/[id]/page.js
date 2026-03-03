@@ -42,71 +42,16 @@ const edgeTypes = {
 // Componente de Textarea com Highlight
 // ==============================
 const HighlightedTextarea = ({ value, onChange, placeholder, rows = 3, id, className }) => {
-    const backdropRef = useRef(null);
-    const textareaRef = useRef(null);
-
-    const handleScroll = (e) => {
-        if (backdropRef.current) {
-            backdropRef.current.scrollTop = e.target.scrollTop;
-            backdropRef.current.scrollLeft = e.target.scrollLeft;
-        }
-    };
-
-    const renderHighlightedText = (text) => {
-        if (!text) return "";
-        const parts = text.split(/(\{[^}]+\})/g);
-        return parts.map((part, i) => {
-            if (part.startsWith('{') && part.endsWith('}')) {
-                return (
-                    <span key={i} style={{ color: '#3b82f6', fontWeight: 'bold', backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: '0 2px', borderRadius: '4px' }}>
-                        {part}
-                    </span>
-                );
-            }
-            return <span key={i}>{part}</span>;
-        });
-    };
-
     return (
-        <div style={{ position: 'relative', width: '100%' }}>
-            <div
-                ref={backdropRef}
-                className={`form-input template-textarea ${className || ''}`}
-                style={{
-                    position: 'absolute',
-                    top: 0, left: 0, right: 0, bottom: 0,
-                    zIndex: 1,
-                    pointerEvents: 'none',
-                    color: value ? '#e2e8f0' : 'var(--text-muted)',
-                    overflow: 'hidden',
-                    whiteSpace: 'pre-wrap',
-                    wordWrap: 'break-word',
-                    margin: 0,
-                    borderColor: 'transparent',
-                }}
-            >
-                {value ? renderHighlightedText(value) : placeholder}
-                {value?.endsWith('\n') ? <br /> : null}
-            </div>
-            <textarea
-                id={id}
-                ref={textareaRef}
-                className={`form-input template-textarea ${className || ''}`}
-                rows={rows}
-                value={value}
-                onChange={onChange}
-                onScroll={handleScroll}
-                style={{
-                    position: 'relative',
-                    zIndex: 2,
-                    background: 'transparent',
-                    color: 'transparent',
-                    caretColor: '#fff',
-                    resize: 'vertical',
-                    margin: 0,
-                }}
-            />
-        </div>
+        <textarea
+            id={id}
+            className={`form-input ${className || ''}`}
+            rows={rows}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            style={{ width: '100%', resize: 'vertical' }}
+        />
     );
 };
 
