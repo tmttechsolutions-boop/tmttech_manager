@@ -40,23 +40,32 @@ export async function POST(req) {
             searchPhone = searchPhone.substring(2);
         }
 
-        // 2. Busca na tabela de "clients" usando os últimos 4 dígitos como filtro inicial rápido
-        const last4 = searchPhone.slice(-4);
-        const { data: clients, error: clientError } = await supabaseExternal
-            .from('clients')
-            .select('id, phone')
-            .ilike('phone', `%${last4}%`);
-
-        if (clientError || !clients || clients.length === 0) {
-            console.error(`[WEBHOOK STATUS] Erro ao achar Client SaaS para telefone final ${last4}`);
-            return NextResponse.json({ error: 'Cliente não encontrado no SaaS' }, { status: 404 });
+        // NOVO: A base SaaS guarda os numeros as vezes com 8 digitos (ex: (37) 98822-3013) 
+        // e as vezes com 9 (ex: (37) 99822-3013). O WhatsApp manda 9.
+        let searchVariations = [searchPhone];
+        if (searchPhone.length === 11) {
+            searchVariations.push(searchPhone.substring(0, 2) + searchPhone.substring(3));
         }
 
-        // Encontra o exato no Javascript pra evitar problemas com máscaras (ex: (37) 98812-3971)
-        const targetClient = clients.find(c => c.phone.replace(/\D/g, '').endsWith(searchPhone) || searchPhone.endsWith(c.phone.replace(/\D/g, '')));
+        // 2. Busca na tabela de "clients" todos
+        const { data: clients, error: clientError } = await supabaseExternal
+            .from('clients')
+            .select('id, phone');
+
+        if (clientError || !clients || clients.length === 0) {
+            console.error(`[WEBHOOK STATUS] Erro ao achar Clients no SaaS`);
+            return NextResponse.json({ error: 'Nenhum Cliente cadastrado no SaaS' }, { status: 404 });
+        }
+
+        // Encontra o exato testando as variacoes
+        const targetClient = clients.find(c => {
+            const dbPhone = c.phone.replace(/\D/g, '');
+            return searchVariations.some(v => v.endsWith(dbPhone) || dbPhone.endsWith(v));
+        });
 
         if (!targetClient) {
-            return NextResponse.json({ error: 'Nenhum cliente real com este telefone encontrado' }, { status: 404 });
+            console.log(`[WEBHOOK STATUS] Nenhum cliente real com telefone ${telefone} encontrado`);
+            return NextResponse.json({ error: 'Nenhum cliente com este telefone encontrado' }, { status: 404 });
         }
 
         // 3. Atualiza o Agendamento MAIS RECENTE PENDENTE desse Cliente no SaaS
