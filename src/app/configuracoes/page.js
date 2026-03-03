@@ -13,8 +13,8 @@ export default function Settings() {
     useEffect(() => {
         if (!empresaId) return;
         async function fetchEmpresa() {
-            const { data } = await supabase.from('empresas').select('store_name').eq('id', empresaId).single();
-            if (data?.store_name) setStoreName(data.store_name);
+            const { data } = await supabase.from('empresas').select('nome').eq('id', empresaId).single();
+            if (data?.nome) setStoreName(data.nome);
         }
         fetchEmpresa();
     }, [empresaId]);
@@ -23,7 +23,7 @@ export default function Settings() {
         if (!empresaId || !storeName) return;
         setLoading(true);
         setSuccess(false);
-        const { error } = await supabase.from('empresas').update({ store_name: storeName }).eq('id', empresaId);
+        const { error } = await supabase.from('empresas').update({ nome: storeName }).eq('id', empresaId);
         setLoading(false);
         if (!error) setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
