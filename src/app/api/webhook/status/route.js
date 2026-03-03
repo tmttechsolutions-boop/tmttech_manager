@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server';
-import { createSupabaseClient } from '@/lib/supabase';
+import { createClient } from '@supabase/supabase-js';
 
 // Rota Interna Segura para o Flow Builder
 // Uso: POST /api/webhook/status
 // Body: { telefone: "553799999999", status: "confirmado" } ou "cancelado"
 export async function POST(req) {
     try {
-        const supabase = createSupabaseClient(true); // Precisamos usar o Service Role (true) para contornar o RLS e garantir edição via API externa
+        const EXTERNAL_URL = process.env.EXTERNAL_SUPABASE_URL;
+        const EXTERNAL_KEY = process.env.EXTERNAL_SUPABASE_ANON_KEY;
+
+        if (!EXTERNAL_URL || !EXTERNAL_KEY) {
+            throw new Error("Credenciais do banco de dados externo não configuradas.");
+        }
+
+        const supabaseExternal = createClient(EXTERNAL_URL, EXTERNAL_KEY);
         const bodyText = await req.text();
 
         let data = {};
@@ -22,67 +29,75 @@ export async function POST(req) {
             return NextResponse.json({ error: 'Campos telefone e status são obrigatórios' }, { status: 400 });
         }
 
-        // 1. Normaliza o Telefone (Regra do 9º Dígito do Brasil)
+        // 1. Normaliza o Telefone (Remove letras e caracteres)
         if (typeof telefone === 'string') {
             telefone = telefone.replace(/\D/g, '');
-            if (telefone.startsWith('55') && telefone.length === 12) {
-                telefone = telefone.substring(0, 4) + '9' + telefone.substring(4);
-            }
         }
 
-        // 2. Busca o Lead dono desse telefone (pegamos o id interno dele)
-        const { data: lead, error: leadError } = await supabase
-            .from('leads')
-            .select('id')
-            .eq('telefone', telefone)
-            .maybeSingle();
-
-        if (leadError || !lead) {
-            console.error(`[WEBHOOK STATUS] Erro ao achar Lead para telefone: ${telefone}`);
-            return NextResponse.json({ error: 'Lead não encontrado no banco de dados' }, { status: 404 });
+        // Remove código do país (55) pra buscar na tabela do SaaS que geralmente guarda só DDD+Numero
+        let searchPhone = telefone;
+        if (searchPhone.startsWith('55') && searchPhone.length >= 12) {
+            searchPhone = searchPhone.substring(2);
         }
 
-        // 3. Atualiza o Agendamento MAIS RECENTE PENDENTE desse Lead
-        // Como o webhook é pra hoje, pegamos qualquer agendamento não-cancelado dele que seja de hoje em diante
+        // 2. Busca na tabela de "clients" usando os últimos 4 dígitos como filtro inicial rápido
+        const last4 = searchPhone.slice(-4);
+        const { data: clients, error: clientError } = await supabaseExternal
+            .from('clients')
+            .select('id, phone')
+            .ilike('phone', `%${last4}%`);
+
+        if (clientError || !clients || clients.length === 0) {
+            console.error(`[WEBHOOK STATUS] Erro ao achar Client SaaS para telefone final ${last4}`);
+            return NextResponse.json({ error: 'Cliente não encontrado no SaaS' }, { status: 404 });
+        }
+
+        // Encontra o exato no Javascript pra evitar problemas com máscaras (ex: (37) 98812-3971)
+        const targetClient = clients.find(c => c.phone.replace(/\D/g, '').endsWith(searchPhone) || searchPhone.endsWith(c.phone.replace(/\D/g, '')));
+
+        if (!targetClient) {
+            return NextResponse.json({ error: 'Nenhum cliente real com este telefone encontrado' }, { status: 404 });
+        }
+
+        // 3. Atualiza o Agendamento MAIS RECENTE PENDENTE desse Cliente no SaaS
         const hojeIso = new Date().toISOString().split('T')[0];
 
-        const { data: agendamentos, error: agFetchError } = await supabase
-            .from('agendamentos')
-            .select('id, status, date_time')
-            .eq('lead_id', lead.id)
-            .gte('date_time', hojeIso)
+        const { data: appointments, error: appFetchError } = await supabaseExternal
+            .from('appointments')
+            .select('id, status, appointment_date')
+            .eq('client_id', targetClient.id)
+            .gte('appointment_date', hojeIso)
             .not('status', 'eq', 'cancelado') // evita cancelar oq ja ta cancelado
-            .order('date_time', { ascending: true }) // pega o evento mais imediato dele
+            .order('appointment_date', { ascending: true }) // pega o evento mais imediato dele
             .limit(1);
 
-        if (agFetchError || !agendamentos || agendamentos.length === 0) {
-            console.log(`[WEBHOOK STATUS] Nenhum agendamento ativo encontrado para lead ${lead.id}`);
-            return NextResponse.json({ error: 'Nenhum agendamento futuro/pendente encontrado para este usuário' }, { status: 404 });
+        if (appFetchError || !appointments || appointments.length === 0) {
+            console.log(`[WEBHOOK STATUS] Nenhum agendamento pendente encontrado para cliente ${targetClient.id}`);
+            return NextResponse.json({ error: 'Nenhum agendamento futuro/pendente encontrado' }, { status: 404 });
         }
 
-        const targetAgendamento = agendamentos[0];
+        const targetAppt = appointments[0];
 
-        // Se o agendamento já tiver o status desejado (ex: usuario clicou Confirmar 2x)
-        if (targetAgendamento.status === status) {
-            return NextResponse.json({ message: 'Agendamento já estava neste status', agendamento_id: targetAgendamento.id }, { status: 200 });
+        if (targetAppt.status === status) {
+            return NextResponse.json({ message: 'Agendamento já estava neste status', agendamento_id: targetAppt.id }, { status: 200 });
         }
 
         // 4. Executa o Update Seguro
-        const { error: updateError } = await supabase
-            .from('agendamentos')
+        const { error: updateError } = await supabaseExternal
+            .from('appointments')
             .update({ status: status })
-            .eq('id', targetAgendamento.id);
+            .eq('id', targetAppt.id);
 
         if (updateError) {
-            console.error(`[WEBHOOK STATUS] Erro ao atualizar Agendamento ${targetAgendamento.id}:`, updateError);
+            console.error(`[WEBHOOK STATUS] Erro ao atualizar Agendamento ${targetAppt.id}:`, updateError);
             return NextResponse.json({ error: 'Falha ao atualizar status' }, { status: 500 });
         }
 
-        console.log(`[WEBHOOK STATUS] ✅ Status alterado para '${status}' no Agendamento ${targetAgendamento.id} do Lead ${lead.id}`);
+        console.log(`[WEBHOOK STATUS] ✅ Status alterado para '${status}' no Agendamento ${targetAppt.id} do Client ${targetClient.id}`);
 
         return NextResponse.json({
             message: 'Status atualizado com sucesso!',
-            agendamento_id: targetAgendamento.id,
+            agendamento_id: targetAppt.id,
             novo_status: status
         }, { status: 200 });
 
