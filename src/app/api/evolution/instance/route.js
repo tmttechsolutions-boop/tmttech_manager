@@ -50,6 +50,12 @@ export async function POST(req) {
                         integration: "WHATSAPP-BAILEYS"
                     })
                 });
+
+                // Salva o nome da instância no banco de dados para a empresa, caso não estivesse salvo
+                await supabase.from('empresas')
+                    .update({ whatsapp_instance: instanceName })
+                    .eq('id', empresaId);
+
             } catch (e) {
                 console.log("Instância pode já existir, prosseguindo para buscar QR Code...");
             }
