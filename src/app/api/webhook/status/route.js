@@ -87,12 +87,22 @@ export async function POST(req) {
             .order('appointment_date', { ascending: true })
             .order('appointment_time', { ascending: true });
 
-        if (appFetchError || !appointments || appointments.length === 0) {
-            console.log(`[WEBHOOK STATUS] Nenhum agendamento pendente encontrado para cliente ${targetClient.id}`);
+        // Se for hoje, só pegamos horários do futuro. Se for data futura, pega qualquer um.
+        // O Supabase tem uma limitação com OR e GTE combinados via API simples, 
+        // então vamos buscar todos futuros não cancelados e filtrar no Javascript.
+        const futureUpcomingAppts = appointments.filter(app => {
+            if (app.appointment_date === hojeIso) {
+                return app.appointment_time >= horaAtual;
+            }
+            return true; // Se for dia seguinte, serve qualquer horario futuro
+        });
+
+        if (futureUpcomingAppts.length === 0) {
+            console.log(`[WEBHOOK STATUS] Nenhum agendamento pendente/futuro encontrado para cliente ${targetClient.id}`);
             return NextResponse.json({ error: 'Nenhum agendamento futuro/pendente encontrado' }, { status: 404 });
         }
 
-        const targetAppt = appointments[0];
+        const targetAppt = futureUpcomingAppts[0];
 
         if (targetAppt.status === status) {
             return NextResponse.json({ message: 'Agendamento já estava neste status', agendamento_id: targetAppt.id }, { status: 200 });
