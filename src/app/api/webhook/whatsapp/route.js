@@ -52,8 +52,7 @@ export async function POST(req) {
         const remoteJid = data.data?.key?.remoteJid || '';
         const isFromMe = data.data?.key?.fromMe === true;
         const isGroup = remoteJid.includes('@g.us');
-
-        const phone = remoteJid.split('@')[0] || data.phone || '';
+        let phone = remoteJid.split('@')[0] || data.phone || '';
 
         // Extração de Nome mais Robusta (Evolution v2)
         const pushNameRaw = data.pushName || data.data?.pushName || data.data?.message?.pushName || '';
