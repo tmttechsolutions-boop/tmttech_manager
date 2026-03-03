@@ -69,16 +69,23 @@ export async function POST(req) {
         }
 
         // 3. Atualiza o Agendamento MAIS RECENTE PENDENTE desse Cliente no SaaS
-        const hojeIso = new Date().toISOString().split('T')[0];
+        const agora = new Date();
+        agora.setHours(agora.getHours() - 3); // Fuso do Brasil (GMT-3) pra rodar certo na Vercel
+
+        const hojeIso = agora.toISOString().split('T')[0];
+        const horaAtual = agora.toISOString().split('T')[1].substring(0, 5); // Ex: "14:30"
 
         const { data: appointments, error: appFetchError } = await supabaseExternal
             .from('appointments')
-            .select('id, status, appointment_date')
+            .select('id, status, appointment_date, appointment_time')
             .eq('client_id', targetClient.id)
             .gte('appointment_date', hojeIso)
-            .not('status', 'eq', 'cancelado') // evita cancelar oq ja ta cancelado
-            .order('appointment_date', { ascending: true }) // pega o evento mais imediato dele
-            .limit(1);
+            // Se for hoje, só pegamos horários do futuro. Se for data futura, pega qualquer um.
+            // O Supabase tem uma limitação com OR e GTE combinados via API simples, 
+            // então vamos buscar todos futuros não cancelados e filtrar no Javascript.
+            .not('status', 'eq', 'cancelado')
+            .order('appointment_date', { ascending: true })
+            .order('appointment_time', { ascending: true });
 
         if (appFetchError || !appointments || appointments.length === 0) {
             console.log(`[WEBHOOK STATUS] Nenhum agendamento pendente encontrado para cliente ${targetClient.id}`);
