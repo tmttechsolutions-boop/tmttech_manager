@@ -43,7 +43,7 @@ export default function Settings() {
                 {/* DADOS DA EMPRESA */}
                 <div className="settings-card glass-panel" style={{ gridColumn: '1 / -1' }}>
                     <div className="card-header">
-                        <h2>🏢 Dados da Barbearia / Empresa</h2>
+                        <h2>🏢 Dados da Empresa</h2>
                     </div>
                     <p className="text-muted mb-4">Essas informações identificam o seu negócio no sistema.</p>
 
@@ -54,7 +54,7 @@ export default function Settings() {
                             className="form-input"
                             value={storeName}
                             onChange={(e) => setStoreName(e.target.value)}
-                            placeholder="Ex: Impar Barbearia"
+                            placeholder="Ex: Nome da sua Empresa"
                         />
                     </div>
 
