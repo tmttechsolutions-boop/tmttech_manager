@@ -74,6 +74,11 @@ export async function POST(req) {
             return NextResponse.json({ message: 'Mensagem vazia ou sem remetente ou é um evento interno ignorado.' }, { status: 200 });
         }
 
+        // 0. Normaliza o número de telefone (Adiciona o 9 para números brasileiros caso falte)
+        if (phone.startsWith('55') && phone.length === 12) {
+            phone = phone.substring(0, 4) + '9' + phone.substring(4);
+        }
+
         console.log(`[WHATSAPP WEBHOOK] Processando mensagem de "${pushName}" (${phone}) (buttonId: ${buttonId}): "${text.substring(0, 30)}..."`);
 
         // 1. Tenta achar quem é esse lead no banco local.

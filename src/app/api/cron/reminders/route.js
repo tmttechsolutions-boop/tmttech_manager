@@ -107,6 +107,12 @@ export async function GET(req) {
 
                 // 3. Garante que o Lead existe localmente para podermos usar o Flow Engine
                 const empresaId = targetRule.empresa_id;
+
+                // Normaliza o número de telefone (Adiciona o 9 para números brasileiros caso falte)
+                if (cleanPhone.startsWith('55') && cleanPhone.length === 12) {
+                    cleanPhone = cleanPhone.substring(0, 4) + '9' + cleanPhone.substring(4);
+                }
+
                 let { data: lead } = await supabaseLocal
                     .from('leads')
                     .select('*')
