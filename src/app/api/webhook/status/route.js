@@ -15,11 +15,13 @@ export async function POST(req) {
 
         const supabaseExternal = createClient(EXTERNAL_URL, EXTERNAL_KEY);
         const bodyText = await req.text();
+        console.log(`[WEBHOOK STATUS] Recebido: ${bodyText}`);
 
         let data = {};
         try {
             data = JSON.parse(bodyText);
         } catch {
+            console.error(`[WEBHOOK STATUS] JSON INVÁLIDO: ${bodyText}`);
             return NextResponse.json({ error: 'Body inválido' }, { status: 400 });
         }
 
