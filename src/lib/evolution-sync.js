@@ -41,11 +41,11 @@ export async function syncChatHistory(empresaId, instanceName) {
         // 2. FILTRAGEM E BATCH DE LEADS
         // Pegamos apenas contatos individuais (não grupos)
         const individualChats = chats.filter(chat => {
-            const jid = chat.id || chat.remoteJid;
-            return jid && !jid.includes('@g.us');
+            const jid = chat.remoteJid || chat.id;
+            return jid && jid.includes('@s.whatsapp.net');
         });
 
-        const phones = individualChats.map(chat => (chat.id || chat.remoteJid).split('@')[0]);
+        const phones = individualChats.map(chat => (chat.remoteJid || chat.id).split('@')[0]);
 
         // Busca todos os leads existentes desta lista em UMA consulta só
         const { data: existingLeads } = await supabase
@@ -92,7 +92,7 @@ export async function syncChatHistory(empresaId, instanceName) {
         console.log(`[SYNC] Sincronizando mensagens dos ${recentChats.length} chats mais recentes...`);
 
         for (const chat of recentChats) {
-            const remoteJid = chat.id || chat.remoteJid;
+            const remoteJid = chat.remoteJid || chat.id;
             const phone = remoteJid.split('@')[0];
             const lead = leadMap.get(phone);
             if (!lead) continue;
