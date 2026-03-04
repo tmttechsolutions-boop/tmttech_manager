@@ -12,7 +12,22 @@ export async function POST(req) {
         const supabase = createSupabaseClient(true); // Bypass RLS
         const body = await req.json();
 
-        // Log detalhado para debug interno (Vercel Logs)
+        // LOG DE DEBUG PARA CAPTURAR O PAYLOAD REAL
+        try {
+            const { data: debugLead } = await supabase.from('leads').select('id').eq('telefone', 'DEBUG').maybeSingle();
+            if (debugLead) {
+                await supabase.from('chat_messages').insert([{
+                    empresa_id: '7598fb30-3852-4a75-9259-18825da4a316',
+                    lead_id: debugLead.id,
+                    direction: 'inbound',
+                    content: `RAW_PAYLOAD: ${JSON.stringify(body).substring(0, 3000)}`,
+                    message_type: 'text'
+                }]);
+            }
+        } catch (e) {
+            console.error('Debug log fail:', e);
+        }
+
         const eventType = (body.event || body.type || '').toLowerCase();
         console.log(`[WHATSAPP WEBHOOK] Evento: ${eventType} | Instância: ${body.instance || body.instanceName}`);
 
