@@ -11,7 +11,7 @@ export async function syncChatHistory(empresaId, instanceName) {
         throw new Error("Credenciais da Evolution API não encontradas.");
     }
 
-    const supabase = createSupabaseClient(true); // Admin client
+    const supabase = createSupabaseClient(true);
     const results = {
         leadsCreated: 0,
         messagesSynced: 0,
@@ -19,9 +19,9 @@ export async function syncChatHistory(empresaId, instanceName) {
     };
 
     try {
-        console.log(`[SYNC] Iniciando sincronização DEEP para ${instanceName}...`);
+        console.log(`[SYNC] Iniciando sincronização OTIMIZADA para ${instanceName}...`);
 
-        // 1. Busca lista de Chats do Evolution (Aumentamos para 100 para pegar mais gente)
+        // 1. Busca lista de Chats do Evolution
         const chatsRes = await fetch(`${EVOLUTION_API_URL}/chat/findChats/${instanceName}`, {
             method: 'POST',
             headers: {
@@ -36,58 +36,82 @@ export async function syncChatHistory(empresaId, instanceName) {
         }
 
         const chats = await chatsRes.json();
+        if (!Array.isArray(chats) || chats.length === 0) return results;
 
-        if (Array.isArray(chats)) {
-            console.log(`[SYNC] Processando ${chats.length} conversas encontradas para sincronizar mensagens...`);
+        // 2. FILTRAGEM E BATCH DE LEADS
+        // Pegamos apenas contatos individuais (não grupos)
+        const individualChats = chats.filter(chat => {
+            const jid = chat.id || chat.remoteJid;
+            return jid && !jid.includes('@g.us');
+        });
 
-            // 2. Processa cada Chat para MENSAGENS
-            for (const chat of chats) {
-                const remoteJid = chat.id || chat.remoteJid;
-                if (!remoteJid || remoteJid.includes('@g.us')) continue; // Pula grupos
+        const phones = individualChats.map(chat => (chat.id || chat.remoteJid).split('@')[0]);
 
-                const phone = remoteJid.split('@')[0];
+        // Busca todos os leads existentes desta lista em UMA consulta só
+        const { data: existingLeads } = await supabase
+            .from('leads')
+            .select('id, telefone, nome')
+            .eq('empresa_id', empresaId)
+            .in('telefone', phones);
 
-                // GARANTE QUE O LEAD EXISTE (Se não existir cria aqui para podermos atrelar as mensagens)
-                let { data: lead } = await supabase
-                    .from('leads')
-                    .select('*')
-                    .eq('telefone', phone)
-                    .maybeSingle();
+        const existingPhones = new Set(existingLeads?.map(l => l.telefone) || []);
+        const leadsToCreate = [];
 
-                if (!lead) {
-                    const { data: newLead } = await supabase
-                        .from('leads')
-                        .insert([{
-                            nome: `Contato ${phone.slice(-4)}`,
-                            telefone: phone,
-                            empresa_id: empresaId,
-                            status: 'novo'
-                        }])
-                        .select()
-                        .single();
-                    lead = newLead;
-                    results.leadsCreated++;
-                }
+        individualChats.forEach(chat => {
+            const phone = (chat.id || chat.remoteJid).split('@')[0];
+            if (!existingPhones.has(phone)) {
+                leadsToCreate.push({
+                    nome: chat.name || `Contato ${phone.slice(-4)}`,
+                    telefone: phone,
+                    empresa_id: empresaId,
+                    status: 'novo'
+                });
+            }
+        });
 
-                if (!lead) continue;
+        // Bulk Insert de novos leads
+        if (leadsToCreate.length > 0) {
+            const { data: created, error: insErr } = await supabase
+                .from('leads')
+                .insert(leadsToCreate)
+                .select();
 
-                // SINC DE MENSAGENS
+            if (!insErr && created) {
+                results.leadsCreated = created.length;
+                // Atualiza a lista de leads locais para o estágio de mensagens
+                if (existingLeads) existingLeads.push(...created);
+            }
+        }
+
+        const allLeads = existingLeads || [];
+        const leadMap = new Map(allLeads.map(l => [l.telefone, l]));
+
+        // 3. SINCRONIZAÇÃO DE MENSAGENS (Limitada aos 20 chats mais recentes para evitar timeout)
+        // Processar 100 chats com mensagens causaria timeout de 10s na Vercel
+        const recentChats = individualChats.slice(0, 20);
+        console.log(`[SYNC] Sincronizando mensagens dos ${recentChats.length} chats mais recentes...`);
+
+        for (const chat of recentChats) {
+            const remoteJid = chat.id || chat.remoteJid;
+            const phone = remoteJid.split('@')[0];
+            const lead = leadMap.get(phone);
+            if (!lead) continue;
+
+            try {
                 const msgsRes = await fetch(`${EVOLUTION_API_URL}/chat/findMessages/${instanceName}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'apikey': EVOLUTION_API_KEY.trim()
                     },
-                    body: JSON.stringify({
-                        where: { remoteJid: remoteJid },
-                        count: 20
-                    })
+                    body: JSON.stringify({ where: { remoteJid }, count: 15 })
                 });
 
                 if (msgsRes.ok) {
                     const messages = await msgsRes.json();
                     const messageList = Array.isArray(messages) ? messages : (messages.record || []);
 
+                    const messagesToInsert = [];
                     for (const msg of messageList) {
                         const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.content || "";
                         if (!text) continue;
@@ -95,82 +119,58 @@ export async function syncChatHistory(empresaId, instanceName) {
                         const createdAt = new Date(msg.messageTimestamp * 1000).toISOString();
                         const direction = msg.key?.fromMe ? 'outbound' : 'inbound';
 
+                        // Check existence in batch would be better, but for 15 messages a few queries are okay
+                        // To be even safer, we could just try to insert and ignore errors if we had a unique constraint
                         const { data: exists } = await supabase
                             .from('chat_messages')
                             .select('id')
                             .eq('lead_id', lead.id)
                             .eq('content', text)
-                            .eq('direction', direction)
+                            .eq('created_at', createdAt)
                             .limit(1);
 
                         if (!exists || exists.length === 0) {
-                            const { error: msgErr } = await supabase
-                                .from('chat_messages')
-                                .insert([{
-                                    empresa_id: empresaId,
-                                    lead_id: lead.id,
-                                    direction: direction,
-                                    content: text,
-                                    message_type: 'text',
-                                    created_at: createdAt
-                                }]);
-
-                            if (!msgErr) results.messagesSynced++;
+                            messagesToInsert.push({
+                                empresa_id: empresaId,
+                                lead_id: lead.id,
+                                direction: direction,
+                                content: text,
+                                message_type: 'text',
+                                created_at: createdAt
+                            });
                         }
                     }
+
+                    if (messagesToInsert.length > 0) {
+                        const { error: mErr } = await supabase.from('chat_messages').insert(messagesToInsert);
+                        if (!mErr) results.messagesSynced += messagesToInsert.length;
+                    }
                 }
+            } catch (err) {
+                console.error(`[SYNC] Erro ao processar mensagens para ${phone}:`, err.message);
             }
         }
 
-        // ========================================================
-        // [NOVO] FASE DE LIMPEZA DE NOMES (GLOBAL NAME CORRECTION)
-        // Por que isso? findChats às vezes não traz todo mundo.
-        // Vamos varrer NOSSOS LEADS e corrigir quem ainda é "Contato XXXX"
-        // ========================================================
-        console.log(`[SYNC] Iniciando limpeza global de nomes para empresa ${empresaId}...`);
-
-        const { data: genericLeads } = await supabase
-            .from('leads')
-            .select('*')
-            .eq('empresa_id', empresaId);
-
-        if (genericLeads && genericLeads.length > 0) {
-            // Filtramos apenas os que são genéricos (Contato XXXX) ou apenas o telefone
-            const toFix = genericLeads.filter(l =>
-                l.nome.startsWith('Contato ') ||
-                l.nome === l.telefone ||
-                !l.nome
-            );
-
-            if (toFix.length > 0) {
-                console.log(`[SYNC] Tentando corrigir ${toFix.length} nomes genéricos via fetchProfile...`);
-
-                for (const lead of toFix) {
-                    try {
-                        const profileRes = await fetch(`${EVOLUTION_API_URL}/chat/fetchProfile/${instanceName}`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'apikey': EVOLUTION_API_KEY.trim()
-                            },
-                            body: JSON.stringify({ number: lead.telefone })
-                        });
-
-                        if (profileRes.ok) {
-                            const profileData = await profileRes.json();
-                            if (profileData.name && profileData.name !== lead.telefone) {
-                                await supabase
-                                    .from('leads')
-                                    .update({ nome: profileData.name })
-                                    .eq('id', lead.id);
-                                console.log(`[SYNC] Nome do Lead ${lead.telefone} corrigido para: ${profileData.name}`);
-                            }
+        // 4. LIMPEZA DE NOMES (Opcional e Rápido)
+        // Só fazemos para os leads que acabamos de carregar se forem genéricos
+        const toFix = allLeads.filter(l => l.nome.startsWith('Contato ')).slice(0, 10);
+        if (toFix.length > 0) {
+            console.log(`[SYNC] Corrigindo ${toFix.length} nomes genéricos...`);
+            await Promise.all(toFix.map(async (lead) => {
+                try {
+                    const pRes = await fetch(`${EVOLUTION_API_URL}/chat/fetchProfile/${instanceName}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY.trim() },
+                        body: JSON.stringify({ number: lead.telefone })
+                    });
+                    if (pRes.ok) {
+                        const pData = await pRes.json();
+                        if (pData.name) {
+                            await supabase.from('leads').update({ nome: pData.name }).eq('id', lead.id);
                         }
-                    } catch (err) {
-                        console.error(`[SYNC] Falha no profile fix para ${lead.telefone}:`, err.message);
                     }
-                }
-            }
+                } catch (e) { }
+            }));
         }
 
         return results;
