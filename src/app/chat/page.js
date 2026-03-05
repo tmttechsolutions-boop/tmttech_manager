@@ -60,8 +60,8 @@ export default function ChatPage() {
                     table: 'chat_messages',
                     filter: `empresa_id=eq.${empresaId}`
                 }, () => {
-                    // Quando chega qualquer mensagem, recarregamos a lista de chats para atualizar orndenação
-                    fetchActiveChats();
+                    // Quando chega qualquer mensagem, recarregamos a lista de chats SILENCIOSAMENTE para atualizar a ordenação sem flicker
+                    fetchActiveChats(true);
                 })
                 .subscribe();
 
@@ -96,8 +96,8 @@ export default function ChatPage() {
 
     useEffect(scrollToBottom, [messages]);
 
-    const fetchActiveChats = async () => {
-        setLoadingLeads(true);
+    const fetchActiveChats = async (silent = false) => {
+        if (!silent) setLoadingLeads(true);
         // Busca leads que já possuem alguma mensagem ou estão no sistema
         // Ordenamos por data da última mensagem descendente
         const { data, error } = await supabase
