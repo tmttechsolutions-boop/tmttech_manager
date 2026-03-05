@@ -36,10 +36,14 @@ export async function syncChatHistory(empresaId, instanceName) {
             return results;
         }
 
-        // 2. FILTRAGEM (Aceita @s.whatsapp.net e @lid)
+        // 2. FILTRAGEM (Aceita @s.whatsapp.net, @lid e IDs HASHED do Evolution v2)
         const individualChats = chats.filter(chat => {
             const jid = chat.remoteJid || chat.id;
-            return jid && (jid.includes('@s.whatsapp.net') || jid.includes('@lid'));
+            if (!jid) return false;
+            // Ignora grupos explicitamente
+            if (jid.includes('@g.us')) return false;
+            // Aceita JID padrão, LID ou o formato HASHED (que geralmente começa com 'cmm' e não tem @ no ID principal)
+            return jid.includes('@s.whatsapp.net') || jid.includes('@lid') || (!jid.includes('@') && jid.length > 15);
         });
 
         console.log(`[SYNC] Processando ${individualChats.length} chats individuais.`);
@@ -47,12 +51,36 @@ export async function syncChatHistory(empresaId, instanceName) {
         // Mapeia telefones para evitar duplicados no mesmo lote
         const phonesToJid = new Map();
         individualChats.forEach(chat => {
-            const jid = chat.remoteJid || chat.id;
-            const phone = jid.split('@')[0];
-            phonesToJid.set(phone, jid);
+            const rawId = chat.id;
+            const remoteJid = chat.remoteJid || '';
+
+            // Prioriza extrair o telefone real
+            let finalPhone = '';
+            const lastMsg = chat.lastMessage?.key || {};
+            const altPn = (lastMsg.participantAlt || chat.participantAlt || lastMsg.remoteJidAlt || chat.remoteJidAlt || '').split('@')[0];
+
+            if (remoteJid.includes('@s.whatsapp.net')) {
+                finalPhone = remoteJid.split('@')[0];
+            } else if (altPn && altPn.length > 5) {
+                finalPhone = altPn;
+            } else if (remoteJid.includes('@lid')) {
+                finalPhone = remoteJid.split('@')[0];
+            } else if (rawId && !rawId.includes('@')) {
+                // Se for hash, e não achamos altPn, usamos o hash como fallback (mas ideal é ter o altPn)
+                finalPhone = rawId;
+            }
+
+            if (finalPhone) {
+                // Se já temos esse telefone e o JID novo for melhor (@s.whatsapp), substitui
+                const existingJid = phonesToJid.get(finalPhone);
+                if (!existingJid || remoteJid.includes('@s.whatsapp.net')) {
+                    phonesToJid.set(finalPhone, remoteJid || rawId);
+                }
+            }
         });
 
         const phones = Array.from(phonesToJid.keys());
+        console.log(`[SYNC] Telefones identificados: ${phones.length}`);
 
         // 3. Busca leads existentes (Batch)
         const { data: existingLeads } = await supabase
@@ -105,16 +133,28 @@ export async function syncChatHistory(empresaId, instanceName) {
         console.log(`[SYNC] Sincronizando mensagens dos ${recentChats.length} chats mais recentes...`);
 
         for (const chat of recentChats) {
-            const remoteJid = chat.remoteJid || chat.id;
-            const phone = remoteJid.split('@')[0];
+            const rawId = chat.id;
+            const remoteJid = chat.remoteJid || '';
+
+            const lastMsg = chat.lastMessage?.key || {};
+            const altPn = (lastMsg.participantAlt || chat.participantAlt || lastMsg.remoteJidAlt || chat.remoteJidAlt || '').split('@')[0];
+
+            let phone = '';
+            if (remoteJid.includes('@s.whatsapp.net')) phone = remoteJid.split('@')[0];
+            else if (altPn) phone = altPn;
+            else if (remoteJid.includes('@lid')) phone = remoteJid.split('@')[0];
+            else phone = rawId;
+
             const lead = existingPhonesMap.get(phone);
             if (!lead || lead.id === 'temp') continue;
+
+            const remoteJidForMessages = remoteJid || rawId;
 
             try {
                 const msgsRes = await fetch(`${EVOLUTION_API_URL}/chat/findMessages/${instanceName}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'apikey': EVOLUTION_API_KEY.trim() },
-                    body: JSON.stringify({ where: { remoteJid }, count: 12 })
+                    body: JSON.stringify({ where: { remoteJid: remoteJidForMessages }, count: 12 })
                 });
 
                 if (msgsRes.ok) {

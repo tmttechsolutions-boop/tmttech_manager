@@ -33,7 +33,17 @@ export async function POST(req) {
             return NextResponse.json({ message: 'Ignored: non-message event' }, { status: 200 });
         }
 
-        const remoteJid = messageData.key.remoteJid || '';
+        const rawRemoteJid = messageData.key.remoteJid || body.data?.remoteJid || '';
+        const participantAlt = messageData.key.participantAlt || body.data?.participantAlt || '';
+        const remoteJidAlt = messageData.key.remoteJidAlt || body.data?.remoteJidAlt || '';
+
+        // Prioriza JID real (@s.whatsapp.net) se o principal for @lid
+        let remoteJid = rawRemoteJid;
+        if (remoteJid.includes('@lid')) {
+            if (participantAlt && participantAlt.includes('@s.whatsapp.net')) remoteJid = participantAlt;
+            else if (remoteJidAlt && remoteJidAlt.includes('@s.whatsapp.net')) remoteJid = remoteJidAlt;
+        }
+
         const isFromMe = messageData.key.fromMe === true;
         if (remoteJid.includes('@g.us')) return NextResponse.json({ message: 'Ignore group' }, { status: 200 });
 
@@ -175,6 +185,20 @@ export async function POST(req) {
                 }
             }
         }
+
+        // LOG FINAL DE SUCESSO
+        try {
+            const { data: debugLeads } = await supabase.from('leads').select('id, empresa_id').eq('telefone', 'DEBUG');
+            if (debugLeads && debugLeads.length > 0) {
+                await supabase.from('chat_messages').insert([{
+                    empresa_id: debugLeads[0].empresa_id,
+                    lead_id: debugLeads[0].id,
+                    direction: 'inbound',
+                    content: `SUCCESS: Processed ${body.event || 'unknown'} for instance ${instanceName}`,
+                    message_type: 'text'
+                }]);
+            }
+        } catch (e) { }
 
         return NextResponse.json({ message: 'Processed' }, { status: 200 });
 
