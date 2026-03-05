@@ -51,8 +51,23 @@ export default function ChatPage() {
                 })
                 .subscribe();
 
+            // Inscreve no Realtime para QUALQUER NOVA MENSAGEM da empresa (para reordenar o topo)
+            const globalMsgChannel = supabase
+                .channel('public:chat_messages_global')
+                .on('postgres_changes', {
+                    event: 'INSERT',
+                    schema: 'public',
+                    table: 'chat_messages',
+                    filter: `empresa_id=eq.${empresaId}`
+                }, () => {
+                    // Quando chega qualquer mensagem, recarregamos a lista de chats para atualizar orndenação
+                    fetchActiveChats();
+                })
+                .subscribe();
+
             return () => {
                 supabase.removeChannel(leadChannel);
+                supabase.removeChannel(globalMsgChannel);
             };
         }
     }, [empresaId]);
@@ -84,18 +99,27 @@ export default function ChatPage() {
     const fetchActiveChats = async () => {
         setLoadingLeads(true);
         // Busca leads que já possuem alguma mensagem ou estão no sistema
-        // Ordenamos por ID descendente para os mais novos (ou criados recentemente) ficarem no topo
+        // Ordenamos por data da última mensagem descendente
         const { data, error } = await supabase
             .from('leads')
             .select(`
-                id, nome, telefone, status,
+                id, nome, telefone, status, created_at,
                 chat_messages(content, created_at)
             `)
-            .eq('empresa_id', empresaId)
-            .order('created_at', { ascending: false });
+            .eq('empresa_id', empresaId);
 
         if (data) {
-            setLeads(data);
+            // Ordenação manual no frontend (quem tem mensagem mais recente no topo)
+            const sorted = data.sort((a, b) => {
+                const lastA = a.chat_messages && a.chat_messages.length > 0
+                    ? new Date(Math.max(...a.chat_messages.map(m => new Date(m.created_at))))
+                    : new Date(a.created_at);
+                const lastB = b.chat_messages && b.chat_messages.length > 0
+                    ? new Date(Math.max(...b.chat_messages.map(m => new Date(m.created_at))))
+                    : new Date(b.created_at);
+                return lastB - lastA;
+            });
+            setLeads(sorted);
         }
         setLoadingLeads(false);
     };
